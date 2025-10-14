@@ -1,5 +1,5 @@
-import express from 'express';
-import {
+const express = require('express');
+const {
   getClubs,
   createClub,
   getClubDetails,
@@ -7,8 +7,8 @@ import {
   leaveClub,
   getClubMembers,
   createClubPost
-} from '../controllers/clubs.js';
-import { authenticateUser } from '../middleware/auth.js';
+} = require('../controllers/clubs');
+const { authenticateUser } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -20,4 +20,4 @@ router.post('/:clubId/join', authenticateUser, joinClub);
 router.post('/leave', authenticateUser, leaveClub);
 router.post('/:clubId/posts', authenticateUser, createClubPost);
 
-export default router;
+module.exports = router;

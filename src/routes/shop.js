@@ -1,12 +1,12 @@
-import express from 'express';
-import {
+const express = require('express');
+const {
   getAvatars,
   purchaseAvatar,
   equipAvatar,
   getUserAvatars,
   getShopItems
-} from '../controllers/shop.js';
-import { authenticateUser, optionalAuth } from '../middleware/auth.js';
+} = require('../controllers/shop');
+const { authenticateUser, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,4 +16,4 @@ router.get('/items', authenticateUser, getShopItems);
 router.post('/avatars/purchase', authenticateUser, purchaseAvatar);
 router.post('/avatars/equip', authenticateUser, equipAvatar);
 
-export default router;
+module.exports = router;

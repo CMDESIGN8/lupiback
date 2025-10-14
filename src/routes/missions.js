@@ -1,11 +1,11 @@
-import express from 'express';
-import {
+const express = require('express');
+const {
   getAvailableMissions,
   updateMissionProgress,
   getDailyMissions,
   getCompletedMissions
-} from '../controllers/missions.js';
-import { authenticateUser } from '../middleware/auth.js';
+} = require('../controllers/missions');
+const { authenticateUser } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -14,4 +14,4 @@ router.get('/daily', authenticateUser, getDailyMissions);
 router.get('/completed', authenticateUser, getCompletedMissions);
 router.post('/progress', authenticateUser, updateMissionProgress);
 
-export default router;
+module.exports = router;
