@@ -1,91 +1,74 @@
-const express = require('express');
-const { createServer } = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
-const routes = require('./src/routes/index');
-const { setupSocketHandlers } = require('./src/sockets/gameSocket');
+dotenv.config();
 
 const app = express();
-const server = createServer(app);
-
-// Configuración de CORS
-const allowedOrigins = [
-  'https://lupi.onrender.com',
-  'http://localhost:5173',
-  'https://lupiback.onrender.com'
-];
-
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
-
-// Middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true
-}));
-
+app.use(cors());
 app.use(express.json());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
+// Conexión a Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY // usamos service role para full access en backend
+);
 
-// Routes
-app.use('/api', routes);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'LupiBack is running!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
+// Rutas de prueba
+app.get("/", (req, res) => {
+  res.send("🐺 LupiApp Backend corriendo...");
 });
 
-// 404 handler
-app.get('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Endpoint not found',
-    available_endpoints: [
-      '/health',
-      '/api/users/*',
-      '/api/missions/*',
-      '/api/shop/*',
-      '/api/clubs/*'
-    ]
-  });
+// Listar perfiles
+app.get("/profiles", async (req, res) => {
+  const { data, error } = await supabase.from("profiles").select("*").limit(10);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
-// Socket.io setup
-setupSocketHandlers(io);
+// Crear personaje
+app.post("/characters", async (req, res) => {
+  const { user_id, nickname } = req.body;
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  const { data, error } = await supabase.from("characters").insert([
+    {
+      user_id,
+      nickname,
+    },
+  ]).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// Obtener personaje por user_id
+app.get("/characters/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabase
+    .from("characters")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// Wallet por personaje
+app.get("/wallets/:characterId", async (req, res) => {
+  const { characterId } = req.params;
+  const { data, error } = await supabase
+    .from("wallets")
+    .select("*")
+    .eq("character_id", characterId)
+    .maybeSingle();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`🚀 LupiApp backend escuchando en http://localhost:${PORT}`);
 });
