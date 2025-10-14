@@ -1,10 +1,9 @@
-import { supabase } from '../config/supabase.js';
+const { supabase } = require('../config/supabase');
 
-export const getAvailableMissions = async (req, res) => {
+const getAvailableMissions = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Obtener misiones disponibles para el usuario
     const { data: missions, error } = await supabase
       .from('missions')
       .select('*')
@@ -13,7 +12,6 @@ export const getAvailableMissions = async (req, res) => {
 
     if (error) throw error;
 
-    // Obtener progreso del usuario
     const { data: progress, error: progressError } = await supabase
       .from('player_missions')
       .select('*')
@@ -21,7 +19,6 @@ export const getAvailableMissions = async (req, res) => {
 
     if (progressError) throw progressError;
 
-    // Combinar misiones con progreso
     const missionsWithProgress = missions.map(mission => {
       const userProgress = progress.find(p => p.mission_id === mission.id);
       return {
@@ -38,12 +35,11 @@ export const getAvailableMissions = async (req, res) => {
   }
 };
 
-export const updateMissionProgress = async (req, res) => {
+const updateMissionProgress = async (req, res) => {
   try {
     const userId = req.user.id;
     const { missionId, progress } = req.body;
 
-    // Verificar si la misión existe
     const { data: mission, error: missionError } = await supabase
       .from('missions')
       .select('*')
@@ -54,7 +50,6 @@ export const updateMissionProgress = async (req, res) => {
 
     const isCompleted = progress >= mission.required_value;
 
-    // Actualizar o crear progreso
     const { data, error } = await supabase
       .from('player_missions')
       .upsert({
@@ -69,7 +64,6 @@ export const updateMissionProgress = async (req, res) => {
 
     if (error) throw error;
 
-    // Si se completó, otorgar recompensas
     if (isCompleted) {
       await grantMissionRewards(userId, mission);
     }
@@ -81,7 +75,6 @@ export const updateMissionProgress = async (req, res) => {
 };
 
 const grantMissionRewards = async (userId, mission) => {
-  // Actualizar experiencia y monedas del jugador
   const { data: player } = await supabase
     .from('players')
     .select('*')
@@ -99,7 +92,6 @@ const grantMissionRewards = async (userId, mission) => {
     .update(updates)
     .eq('id', userId);
 
-  // Si es misión diaria, incrementar contador
   if (mission.is_daily) {
     await supabase
       .from('players')
@@ -110,7 +102,7 @@ const grantMissionRewards = async (userId, mission) => {
   }
 };
 
-export const getDailyMissions = async (req, res) => {
+const getDailyMissions = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -122,7 +114,6 @@ export const getDailyMissions = async (req, res) => {
 
     if (error) throw error;
 
-    // Obtener progreso del usuario
     const { data: progress } = await supabase
       .from('player_missions')
       .select('*')
@@ -143,7 +134,7 @@ export const getDailyMissions = async (req, res) => {
   }
 };
 
-export const getCompletedMissions = async (req, res) => {
+const getCompletedMissions = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -165,4 +156,11 @@ export const getCompletedMissions = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+module.exports = {
+  getAvailableMissions,
+  updateMissionProgress,
+  getDailyMissions,
+  getCompletedMissions
 };

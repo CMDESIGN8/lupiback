@@ -1,6 +1,6 @@
-import { supabase } from '../config/supabase.js';
+const { supabase } = require('../config/supabase');
 
-export const getClubs = async (req, res) => {
+const getClubs = async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
 
@@ -8,7 +8,6 @@ export const getClubs = async (req, res) => {
       .from('clubs')
       .select(`
         *,
-        owner_id,
         players!inner (id, username, level),
         club_missions (count)
       `, { count: 'exact' });
@@ -36,12 +35,11 @@ export const getClubs = async (req, res) => {
   }
 };
 
-export const createClub = async (req, res) => {
+const createClub = async (req, res) => {
   try {
     const userId = req.user.id;
     const { name, description } = req.body;
 
-    // Verificar si el usuario ya tiene un club
     const { data: existingClub } = await supabase
       .from('clubs')
       .select('id')
@@ -52,7 +50,6 @@ export const createClub = async (req, res) => {
       return res.status(400).json({ error: 'Ya eres dueño de un club' });
     }
 
-    // Crear el club
     const { data: club, error } = await supabase
       .from('clubs')
       .insert([
@@ -70,7 +67,6 @@ export const createClub = async (req, res) => {
 
     if (error) throw error;
 
-    // Unir al usuario al club como owner
     await supabase
       .from('players')
       .update({ club_id: club.id })
@@ -82,7 +78,7 @@ export const createClub = async (req, res) => {
   }
 };
 
-export const getClubDetails = async (req, res) => {
+const getClubDetails = async (req, res) => {
   try {
     const { clubId } = req.params;
 
@@ -117,12 +113,11 @@ export const getClubDetails = async (req, res) => {
   }
 };
 
-export const joinClub = async (req, res) => {
+const joinClub = async (req, res) => {
   try {
     const userId = req.user.id;
     const { clubId } = req.params;
 
-    // Verificar si el usuario ya está en un club
     const { data: player } = await supabase
       .from('players')
       .select('club_id')
@@ -133,7 +128,6 @@ export const joinClub = async (req, res) => {
       return res.status(400).json({ error: 'Ya perteneces a un club' });
     }
 
-    // Unir al usuario al club
     const { data, error } = await supabase
       .from('players')
       .update({ club_id: clubId })
@@ -152,7 +146,7 @@ export const joinClub = async (req, res) => {
   }
 };
 
-export const leaveClub = async (req, res) => {
+const leaveClub = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -171,7 +165,7 @@ export const leaveClub = async (req, res) => {
   }
 };
 
-export const getClubMembers = async (req, res) => {
+const getClubMembers = async (req, res) => {
   try {
     const { clubId } = req.params;
 
@@ -199,13 +193,12 @@ export const getClubMembers = async (req, res) => {
   }
 };
 
-export const createClubPost = async (req, res) => {
+const createClubPost = async (req, res) => {
   try {
     const userId = req.user.id;
     const { clubId } = req.params;
     const { content, imageUrl } = req.body;
 
-    // Verificar que el usuario pertenece al club
     const { data: player } = await supabase
       .from('players')
       .select('club_id')
@@ -239,4 +232,14 @@ export const createClubPost = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+module.exports = {
+  getClubs,
+  createClub,
+  getClubDetails,
+  joinClub,
+  leaveClub,
+  getClubMembers,
+  createClubPost
 };

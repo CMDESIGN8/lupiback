@@ -1,6 +1,6 @@
-import { supabase } from '../config/supabase.js';
+const { supabase } = require('../config/supabase');
 
-export const getAvatars = async (req, res) => {
+const getAvatars = async (req, res) => {
   try {
     const userId = req.user?.id;
 
@@ -12,7 +12,6 @@ export const getAvatars = async (req, res) => {
 
     if (error) throw error;
 
-    // Si el usuario está autenticado, obtener sus avatares
     if (userId) {
       const { data: userAvatars } = await supabase
         .from('player_avatars')
@@ -34,12 +33,11 @@ export const getAvatars = async (req, res) => {
   }
 };
 
-export const purchaseAvatar = async (req, res) => {
+const purchaseAvatar = async (req, res) => {
   try {
     const userId = req.user.id;
     const { avatarId } = req.body;
 
-    // Obtener información del avatar
     const { data: avatar, error: avatarError } = await supabase
       .from('avatars')
       .select('*')
@@ -48,7 +46,6 @@ export const purchaseAvatar = async (req, res) => {
 
     if (avatarError) throw avatarError;
 
-    // Verificar si el usuario ya tiene el avatar
     const { data: existingAvatar } = await supabase
       .from('player_avatars')
       .select('id')
@@ -60,7 +57,6 @@ export const purchaseAvatar = async (req, res) => {
       return res.status(400).json({ error: 'Ya posees este avatar' });
     }
 
-    // Verificar fondos del usuario
     const { data: player, error: playerError } = await supabase
       .from('players')
       .select('lupi_coins, level')
@@ -77,7 +73,6 @@ export const purchaseAvatar = async (req, res) => {
       return res.status(400).json({ error: 'Nivel insuficiente para este avatar' });
     }
 
-    // Realizar la compra
     await supabase
       .from('players')
       .update({
@@ -85,7 +80,6 @@ export const purchaseAvatar = async (req, res) => {
       })
       .eq('id', userId);
 
-    // Agregar avatar al jugador
     const { data: playerAvatar, error } = await supabase
       .from('player_avatars')
       .insert([
@@ -110,18 +104,16 @@ export const purchaseAvatar = async (req, res) => {
   }
 };
 
-export const equipAvatar = async (req, res) => {
+const equipAvatar = async (req, res) => {
   try {
     const userId = req.user.id;
     const { avatarId } = req.body;
 
-    // Primero, desequipar todos los avatares del usuario
     await supabase
       .from('player_avatars')
       .update({ is_equipped: false })
       .eq('player_id', userId);
 
-    // Equipar el avatar seleccionado
     const { data, error } = await supabase
       .from('player_avatars')
       .update({ is_equipped: true })
@@ -135,7 +127,6 @@ export const equipAvatar = async (req, res) => {
 
     if (error) throw error;
 
-    // Actualizar también en room_users para mostrar en tiempo real
     await supabase
       .from('room_users')
       .update({
@@ -149,7 +140,7 @@ export const equipAvatar = async (req, res) => {
   }
 };
 
-export const getUserAvatars = async (req, res) => {
+const getUserAvatars = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -171,7 +162,7 @@ export const getUserAvatars = async (req, res) => {
   }
 };
 
-export const getShopItems = async (req, res) => {
+const getShopItems = async (req, res) => {
   try {
     const { data: items, error } = await supabase
       .from('items')
@@ -184,4 +175,12 @@ export const getShopItems = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+module.exports = {
+  getAvatars,
+  purchaseAvatar,
+  equipAvatar,
+  getUserAvatars,
+  getShopItems
 };
