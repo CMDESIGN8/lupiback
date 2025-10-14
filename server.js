@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import characterRoutes from "./routes/characters.js";
+
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.get("/profiles", async (req, res) => {
 // ----------------------
 // PERSONAJES
 // ----------------------
+
+app.use("/characters", characterRoutes);
 
 // Crear personaje
 app.post("/characters", async (req, res) => {
