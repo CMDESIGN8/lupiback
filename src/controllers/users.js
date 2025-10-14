@@ -1,6 +1,6 @@
-import { supabase } from '../config/supabase.js';
+const { supabase } = require('../config/supabase');
 
-export const getUserProfile = async (req, res) => {
+const getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -27,7 +27,7 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
-export const updateUserProfile = async (req, res) => {
+const updateUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { username, position, sport } = req.body;
@@ -52,7 +52,7 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
-export const getUserStats = async (req, res) => {
+const getUserStats = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -70,7 +70,7 @@ export const getUserStats = async (req, res) => {
   }
 };
 
-export const updatePlayerPosition = async (req, res) => {
+const updatePlayerPosition = async (req, res) => {
   try {
     const userId = req.user.id;
     const { x, y, direction } = req.body;
@@ -96,7 +96,7 @@ export const updatePlayerPosition = async (req, res) => {
   }
 };
 
-export const getOnlinePlayers = async (req, res) => {
+const getOnlinePlayers = async (req, res) => {
   try {
     const { data: players, error } = await supabase
       .from('room_users')
@@ -110,4 +110,12 @@ export const getOnlinePlayers = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+module.exports = {
+  getUserProfile,
+  updateUserProfile,
+  getUserStats,
+  updatePlayerPosition,
+  getOnlinePlayers
 };

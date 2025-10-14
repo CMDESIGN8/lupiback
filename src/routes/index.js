@@ -1,8 +1,8 @@
-import express from 'express';
-import users from './users.js';
-import missions from './missions.js';
-import shop from './shop.js';
-import clubs from './clubs.js';
+const express = require('express');
+const users = require('./users');
+const missions = require('./missions');
+const shop = require('./shop');
+const clubs = require('./clubs');
 
 const router = express.Router();
 
@@ -11,4 +11,4 @@ router.use('/missions', missions);
 router.use('/shop', shop);
 router.use('/clubs', clubs);
 
-export default router;
+module.exports = router;

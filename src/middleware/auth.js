@@ -1,6 +1,6 @@
-import { supabase } from '../config/supabase.js';
+const { supabase } = require('../config/supabase');
 
-export const authenticateUser = async (req, res, next) => {
+const authenticateUser = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
@@ -21,7 +21,7 @@ export const authenticateUser = async (req, res, next) => {
   }
 };
 
-export const optionalAuth = async (req, res, next) => {
+const optionalAuth = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
@@ -34,4 +34,9 @@ export const optionalAuth = async (req, res, next) => {
   } catch (error) {
     next();
   }
+};
+
+module.exports = {
+  authenticateUser,
+  optionalAuth
 };
