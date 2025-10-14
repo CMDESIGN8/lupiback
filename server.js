@@ -11,6 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
+
 // Conexión a Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -110,40 +112,13 @@ app.post("/characters/:characterId/stats", async (req, res) => {
 // ----------------------
 // ENTRENAMIENTO
 // ----------------------
-app.post("/characters/:characterId/train", async (req, res) => {
-  const { characterId } = req.params;
-
-  // Obtenemos el personaje
-  const { data: character, error: getError } = await supabase
-    .from("characters")
-    .select("*")
-    .eq("id", characterId)
-    .maybeSingle();
-
-  if (getError || !character) return res.status(404).json({ error: "Personaje no encontrado" });
-
-  // Lógica de entrenamiento: ejemplo
-  const updatedCharacter = {
-    experience: (character.experience || 0) + 10,
-    skill_points: (character.skill_points || 0) + 1,
-  };
-
-  const { data, error: updateError } = await supabase
-    .from("characters")
-    .update(updatedCharacter)
-    .eq("id", characterId)
-    .select()
-    .single();
-
-  if (updateError) return res.status(400).json({ error: updateError.message });
-  res.json(data);
-});
 
 // Calcular experiencia necesaria para un nivel dado
 function xpForLevel(level) {
   // Fórmula exponencial ligera
   return Math.floor(100 * Math.pow(1.2, level - 1));
 }
+const router = express.Router();
 
 router.post("/:id/train", async (req, res) => {
   const { id } = req.params;
