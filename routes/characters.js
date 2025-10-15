@@ -47,6 +47,46 @@ router.post("/:id/train", async (req, res) => {
       expNeeded = xpForLevel(newLevel);
     }
 
+    // Actualizar un skill del personaje
+router.put("/:id/stat", async (req, res) => {
+  const { id } = req.params;
+  const { skillKey } = req.body; // ej: "potencia"
+  
+  if (!skillKey) return res.status(400).json({ error: "No se indicó skill" });
+
+  try {
+    const { data: char, error: charError } = await supabase
+      .from("characters")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (charError || !char) return res.status(404).json({ error: "Personaje no encontrado" });
+
+    if (char.available_skill_points <= 0) return res.status(400).json({ error: "No quedan skill points" });
+
+    // Limite máximo 100 por skill
+    const nuevoValor = Math.min((char[skillKey] || 0) + 1, 100);
+
+    const { data: updatedChar, error: updateError } = await supabase
+      .from("characters")
+      .update({
+        [skillKey]: nuevoValor,
+        available_skill_points: char.available_skill_points - 1
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) return res.status(400).json({ error: updateError.message });
+
+    return res.json({ character: updatedChar });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
+
     // Actualizar personaje
     const { data: updatedChar, error: updateError } = await supabase
       .from("characters")
