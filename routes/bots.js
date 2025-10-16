@@ -291,6 +291,42 @@ router.get("/matches/history/:characterId", async (req, res) => {
 });
 
 /* ===============================
+   GET MATCH HISTORY FOR CHARACTER
+   =============================== */
+router.get("/matches/history/:characterId", async (req, res) => {
+  const { characterId } = req.params;
+
+  try {
+    const { data: matches, error } = await supabase
+      .from("matches")
+      .select(`
+        *,
+        bot:player2_id (
+          name,
+          level,
+          difficulty
+        )
+      `)
+      .eq("player1_id", characterId)
+      .eq("match_type", "bot")
+      .eq("status", "finished")
+      .order("finished_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("❌ Error en consulta de historial:", error);
+      throw error;
+    }
+
+    console.log(`✅ Historial obtenido: ${matches?.length || 0} partidas`);
+    res.json({ matches: matches || [] });
+  } catch (err) {
+    console.error("❌ Error obteniendo historial:", err);
+    res.status(500).json({ error: "Error interno al obtener historial" });
+  }
+});
+
+/* ===============================
    FUNCIONES AUXILIARES
    =============================== */
 function simulateBotMatch(player, bot) {
