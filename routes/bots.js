@@ -260,35 +260,56 @@ router.post("/:matchId/simulate", async (req, res) => {
 });
 
 /* ===============================
-   GET MATCH HISTORY FOR CHARACTER
+   HISTORIAL DE PARTIDAS
    =============================== */
-router.get("/history/:characterId", async (req, res) => {  // ✅ CORREGIDO: solo "/history/"
+router.get("/history/:characterId", async (req, res) => {
   const { characterId } = req.params;
 
   try {
-    const { data: matches, error } = await supabase
+    // Primero obtener las partidas
+    const { data: matches, error: matchesError } = await supabase
       .from("matches")
-      .select(`
-        *,
-        bot:player2_id (
-          name,
-          level,
-          difficulty
-        )
-      `)
+      .select("*")
       .eq("player1_id", characterId)
       .eq("match_type", "bot")
       .eq("status", "finished")
       .order("finished_at", { ascending: false })
       .limit(10);
 
-    if (error) {
-      console.error("❌ Error en consulta de historial:", error);
-      throw error;
+    if (matchesError) {
+      console.error("❌ Error obteniendo partidas:", matchesError);
+      throw matchesError;
     }
 
-    console.log(`✅ Historial obtenido: ${matches?.length || 0} partidas`);
-    res.json({ matches: matches || [] });
+    if (!matches || matches.length === 0) {
+      return res.json({ matches: [] });
+    }
+
+    // Obtener los IDs de los bots de las partidas
+    const botIds = matches.map(match => match.player2_id).filter(id => id);
+
+    // Obtener información de los bots
+    const { data: bots, error: botsError } = await supabase
+      .from("bots")
+      .select("id, name, level, difficulty")
+      .in("id", botIds);
+
+    if (botsError) {
+      console.error("❌ Error obteniendo bots:", botsError);
+      throw botsError;
+    }
+
+    // Combinar la información
+    const matchesWithBotInfo = matches.map(match => {
+      const bot = bots.find(b => b.id === match.player2_id);
+      return {
+        ...match,
+        bot: bot || { name: "Bot Desconocido", level: 1, difficulty: "easy" }
+      };
+    });
+
+    console.log(`✅ Historial obtenido: ${matchesWithBotInfo.length} partidas`);
+    res.json({ matches: matchesWithBotInfo });
   } catch (err) {
     console.error("❌ Error obteniendo historial:", err);
     res.status(500).json({ error: "Error interno al obtener historial" });
