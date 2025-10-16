@@ -260,40 +260,9 @@ router.post("/:matchId/simulate", async (req, res) => {
 });
 
 /* ===============================
-   HISTORIAL DE PARTIDAS
-   =============================== */
-router.get("/matches/history/:characterId", async (req, res) => {
-  const { characterId } = req.params;
-
-  try {
-    const { data: matches, error } = await supabase
-      .from("matches")
-      .select(`
-        *,
-        bot:player2_id (
-          name,
-          level
-        )
-      `)
-      .eq("player1_id", characterId)
-      .eq("match_type", "bot")
-      .eq("status", "finished")
-      .order("finished_at", { ascending: false })
-      .limit(10);
-
-    if (error) throw error;
-
-    res.json({ matches: matches || [] });
-  } catch (err) {
-    console.error("❌ Error obteniendo historial:", err);
-    res.status(500).json({ error: "Error interno al obtener historial" });
-  }
-});
-
-/* ===============================
    GET MATCH HISTORY FOR CHARACTER
    =============================== */
-router.get("/matches/history/:characterId", async (req, res) => {
+router.get("/history/:characterId", async (req, res) => {  // ✅ CORREGIDO: solo "/history/"
   const { characterId } = req.params;
 
   try {
