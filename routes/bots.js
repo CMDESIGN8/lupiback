@@ -154,39 +154,61 @@ router.post("/:matchId/simulate", async (req, res) => {
       throw updateError;
     }
     
-    // 5. Aplicar recompensas al personaje (EXP)
-    const { error: expError } = await supabase.rpc('update_character_stats', {
-      character_id: player.id,
-      experience_to_add: rewards.exp,
-    });
+    // 5. Aplicar recompensas de EXP al personaje
+    const { error: expError } = await supabase
+      .from('characters')
+      .update({ 
+        experience: (player.experience || 0) + rewards.exp 
+      })
+      .eq('id', player.id);
 
     if (expError) {
       console.error("❌ Error aplicando EXP:", expError);
+    } else {
+      console.log("✅ EXP añadido al personaje:", rewards.exp);
     }
 
-    // 6. Aplicar recompensas de lupicoins a la wallet del usuario
-    const { error: coinsError } = await supabase.rpc('update_user_wallet', {
-      user_id: player.user_id,
-      coins_to_add: rewards.coins,
-    });
+    // 6. Aplicar recompensas de lupicoins a la wallet del personaje
+    // Primero verificar si existe wallet para el personaje
+    const { data: wallet, error: walletCheckError } = await supabase
+      .from('wallets')
+      .select('id, lupicoins')
+      .eq('character_id', player.id)
+      .single();
 
-    if (coinsError) {
-      console.error("❌ Error aplicando lupicoins:", coinsError);
-      // Si no existe la función RPC, usar update directo
-      const { error: walletError } = await supabase
-        .from('profiles')
+    if (walletCheckError && walletCheckError.code !== 'PGRST116') {
+      console.error("❌ Error buscando wallet:", walletCheckError);
+    }
+
+    if (wallet) {
+      // Si existe la wallet, actualizar
+      const { error: coinsError } = await supabase
+        .from('wallets')
         .update({ 
-          lupicoins: supabase.raw(`COALESCE(lupicoins, 0) + ${rewards.coins}`)
+          lupicoins: (parseFloat(wallet.lupicoins) || 0) + rewards.coins 
         })
-        .eq('id', player.user_id);
+        .eq('character_id', player.id);
 
-      if (walletError) {
-        console.error("❌ Error alternativo aplicando lupicoins:", walletError);
+      if (coinsError) {
+        console.error("❌ Error actualizando lupicoins:", coinsError);
       } else {
-        console.log("✅ Lupicoins añadidos via update directo");
+        console.log("✅ Lupicoins añadidos a wallet existente:", rewards.coins);
       }
     } else {
-      console.log("✅ Lupicoins añadidos via RPC");
+      // Si no existe wallet, crear una nueva
+      const { error: createWalletError } = await supabase
+        .from('wallets')
+        .insert({
+          character_id: player.id,
+          address: `wallet_${player.id}_${Date.now()}`,
+          lupicoins: rewards.coins
+        });
+
+      if (createWalletError) {
+        console.error("❌ Error creando wallet:", createWalletError);
+      } else {
+        console.log("✅ Nueva wallet creada con lupicoins:", rewards.coins);
+      }
     }
 
     const message = simulation.winnerId === player.id
