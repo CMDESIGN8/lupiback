@@ -22,35 +22,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Agrega esto en tu archivo de rutas de bots o matches
-router.get("/matches/history/:characterId", async (req, res) => {
-  const { characterId } = req.params;
-
-  try {
-    const { data: matches, error } = await supabase
-      .from("matches")
-      .select(`
-        *,
-        bot:player2_id (
-          name,
-          level
-        )
-      `)
-      .eq("player1_id", characterId)
-      .eq("match_type", "bot")
-      .eq("status", "finished")
-      .order("finished_at", { ascending: false })
-      .limit(10);
-
-    if (error) throw error;
-
-    res.json({ matches: matches || [] });
-  } catch (err) {
-    console.error("❌ Error obteniendo historial:", err);
-    res.status(500).json({ error: "Error interno al obtener historial" });
-  }
-});
-
 /* ===============================
    START MATCH
    =============================== */
@@ -183,18 +154,43 @@ router.post("/:matchId/simulate", async (req, res) => {
       throw updateError;
     }
     
-    // 5. Aplicar recompensas de EXP al personaje
+    // ============================================
+    // 5. SISTEMA DE NIVELES AUTOMÁTICO (NUEVO CÓDIGO)
+    // ============================================
+    const newExperience = (player.experience || 0) + rewards.exp;
+    let currentLevel = player.level || 1;
+    let currentExp = newExperience;
+    let expToNextLevel = player.experience_to_next_level || 100;
+    let leveledUp = false;
+    let levelsGained = 0;
+
+    // Calcular niveles ganados
+    while (currentExp >= expToNextLevel && currentLevel < 50) { // Límite máximo nivel 50
+      currentExp -= expToNextLevel;
+      currentLevel++;
+      levelsGained++;
+      expToNextLevel = Math.round(expToNextLevel * 1.2); // 20% más EXP para el siguiente nivel
+      leveledUp = true;
+    }
+
+    // Actualizar personaje con nuevo nivel y EXP
     const { error: expError } = await supabase
       .from('characters')
       .update({ 
-        experience: (player.experience || 0) + rewards.exp 
+        experience: currentExp,
+        level: currentLevel,
+        experience_to_next_level: expToNextLevel,
+        available_skill_points: player.available_skill_points + (levelsGained * 2) // 2 puntos por nivel
       })
       .eq('id', player.id);
 
     if (expError) {
-      console.error("❌ Error aplicando EXP:", expError);
+      console.error("❌ Error aplicando EXP y niveles:", expError);
     } else {
-      console.log("✅ EXP añadido al personaje:", rewards.exp);
+      console.log(`✅ EXP aplicado. Nivel: ${currentLevel}, EXP: ${currentExp}/${expToNextLevel}`);
+      if (leveledUp) {
+        console.log(`🎉 ¡Subió ${levelsGained} nivel(es)!`);
+      }
     }
 
     // 6. Aplicar recompensas de lupicoins a la wallet del personaje
@@ -250,11 +246,47 @@ router.post("/:matchId/simulate", async (req, res) => {
       match: updatedMatch,
       simulation,
       rewards,
-      message
+      message,
+      leveledUp: leveledUp,
+      levelsGained: levelsGained,
+      newLevel: currentLevel,
+      newExp: currentExp,
+      expToNextLevel: expToNextLevel
     });
   } catch (err) {
     console.error("❌ Error fatal simulando partida:", err);
     res.status(500).json({ error: "Error interno al simular partida" });
+  }
+});
+
+/* ===============================
+   HISTORIAL DE PARTIDAS
+   =============================== */
+router.get("/matches/history/:characterId", async (req, res) => {
+  const { characterId } = req.params;
+
+  try {
+    const { data: matches, error } = await supabase
+      .from("matches")
+      .select(`
+        *,
+        bot:player2_id (
+          name,
+          level
+        )
+      `)
+      .eq("player1_id", characterId)
+      .eq("match_type", "bot")
+      .eq("status", "finished")
+      .order("finished_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    res.json({ matches: matches || [] });
+  } catch (err) {
+    console.error("❌ Error obteniendo historial:", err);
+    res.status(500).json({ error: "Error interno al obtener historial" });
   }
 });
 
