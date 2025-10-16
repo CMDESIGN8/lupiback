@@ -1,3 +1,89 @@
+// routes/bots.js
+import express from "express";
+import { supabase } from "../supabaseClient.js";
+
+const router = express.Router();
+
+/* ===============================
+   GET BOTS: Listar bots disponibles
+   =============================== */
+router.get("/", async (req, res) => {
+  try {
+    const { data: bots, error } = await supabase
+      .from("bots")
+      .select("*")
+      .order("level", { ascending: true });
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ bots });
+  } catch (err) {
+    console.error("❌ Error obteniendo bots:", err);
+    return res.status(500).json({ error: "Error interno al obtener bots" });
+  }
+});
+
+/* ===============================
+   START BOT MATCH: Iniciar partida contra bot
+   =============================== */
+router.post("/match", async (req, res) => {
+  const { characterId, botId } = req.body;
+
+  try {
+    // Verificar personaje
+    const { data: character, error: charError } = await supabase
+      .from("characters")
+      .select("*")
+      .eq("id", characterId)
+      .single();
+
+    if (charError || !character) {
+      return res.status(404).json({ error: "Personaje no encontrado" });
+    }
+
+    // Obtener bot
+    const { data: bot, error: botError } = await supabase
+      .from("bots")
+      .select("*")
+      .eq("id", botId)
+      .single();
+
+    if (botError || !bot) {
+      return res.status(404).json({ error: "Bot no encontrado" });
+    }
+
+    // Crear partida contra bot
+    const { data: match, error: matchError } = await supabase
+      .from("matches")
+      .insert([
+        {
+          player1_id: characterId,
+          player2_id: botId,
+          match_type: "bot",
+          status: "in_progress",
+          started_at: new Date(),
+        },
+      ])
+      .select()
+      .single();
+
+    if (matchError) {
+      return res.status(400).json({ error: matchError.message });
+    }
+
+    res.json({ 
+      match, 
+      bot,
+      message: `Partida contra ${bot.name} iniciada` 
+    });
+  } catch (err) {
+    console.error("❌ Error en bot match:", err);
+    return res.status(500).json({ error: "Error interno al iniciar partida" });
+  }
+});
+
 /* ===============================
    SIMULATE BOT MATCH: Simular resultado contra bot
    =============================== */
@@ -45,12 +131,12 @@ router.post("/:matchId/simulate", async (req, res) => {
       return res.status(400).json({ error: updateError.message });
     }
 
-    // Dar recompensas si ganó
+    // Dar recompensas
     let rewards = null;
     if (simulation.winnerId === match.player1_id) {
       rewards = await giveMatchRewards(match.player1_id, true, match.player2.level);
     } else if (simulation.player1Score === simulation.player2Score) {
-      rewards = await giveMatchRewards(match.player1_id, false, match.player2.level); // Empate
+      rewards = await giveMatchRewards(match.player1_id, false, match.player2.level);
     }
 
     res.json({
@@ -72,42 +158,32 @@ router.post("/:matchId/simulate", async (req, res) => {
 });
 
 /* ===============================
-   FUNCIONES HELPER PARA SIMULACIÓN
+   FUNCIONES HELPER
    =============================== */
 
-// Simular partida contra bot
 function simulateBotMatch(player, bot) {
-  // Calcular ventajas basadas en stats
   const playerStats = calculateAverageStats(player);
   const botStats = calculateAverageStats(bot);
   
-  // Diferencia de nivel (afecta probabilidades)
   const levelDiff = (player.level || 1) - (bot.level || 1);
-  
-  // Base de goles (entre 0 y 5)
   const baseGoals = Math.floor(Math.random() * 3) + 1;
   
-  // Calcular ventaja del jugador
-  let playerAdvantage = (playerStats - botStats) / 100; // 0.1 = 10% ventaja
-  playerAdvantage += levelDiff * 0.1; // +10% por nivel de ventaja
+  let playerAdvantage = (playerStats - botStats) / 100;
+  playerAdvantage += levelDiff * 0.1;
   
-  // Ajustar resultados basado en ventaja
   let playerScore = baseGoals;
   let botScore = baseGoals;
   
   if (playerAdvantage > 0) {
-    // Jugador tiene ventaja
-    const advantageFactor = 1 + Math.min(playerAdvantage, 0.5); // Máximo +50%
+    const advantageFactor = 1 + Math.min(playerAdvantage, 0.5);
     playerScore = Math.round(baseGoals * advantageFactor);
     botScore = Math.max(0, baseGoals - Math.floor(playerAdvantage * 2));
   } else {
-    // Bot tiene ventaja
-    const disadvantageFactor = 1 + Math.min(Math.abs(playerAdvantage), 0.3); // Máximo +30%
+    const disadvantageFactor = 1 + Math.min(Math.abs(playerAdvantage), 0.3);
     botScore = Math.round(baseGoals * disadvantageFactor);
     playerScore = Math.max(0, baseGoals - Math.floor(Math.abs(playerAdvantage) * 1.5));
   }
   
-  // Asegurar que no sea empate siempre (50% de probabilidad de desempate)
   if (playerScore === botScore && Math.random() > 0.5) {
     if (playerAdvantage > 0) {
       playerScore += 1;
@@ -116,7 +192,6 @@ function simulateBotMatch(player, bot) {
     }
   }
   
-  // Limitar a máximo 7 goles
   playerScore = Math.min(playerScore, 7);
   botScore = Math.min(botScore, 7);
   
@@ -134,20 +209,16 @@ function simulateBotMatch(player, bot) {
   };
 }
 
-// Calcular promedio de stats principales
 function calculateAverageStats(character) {
   const stats = ['pase', 'tiro', 'regate', 'velocidad', 'defensa', 'potencia'];
   const total = stats.reduce((sum, stat) => sum + (character[stat] || 50), 0);
   return total / stats.length;
 }
 
-// Dar recompensas por partida contra bot
 async function giveMatchRewards(characterId, isWinner, botLevel) {
-  // Recompensas base ajustadas por nivel del bot
   const baseExp = isWinner ? 150 : 75;
   const baseCoins = isWinner ? 200 : 100;
   
-  // Bonus por nivel del bot (+10% por nivel sobre el jugador)
   const { data: character } = await supabase
     .from("characters")
     .select("level")
@@ -156,7 +227,7 @@ async function giveMatchRewards(characterId, isWinner, botLevel) {
 
   let levelBonus = 0;
   if (character && botLevel > character.level) {
-    levelBonus = (botLevel - character.level) * 0.1; // +10% por nivel de desventaja
+    levelBonus = (botLevel - character.level) * 0.1;
   }
 
   const expReward = Math.round(baseExp * (1 + levelBonus));
@@ -193,4 +264,5 @@ async function giveMatchRewards(characterId, isWinner, botLevel) {
   return { expReward, coinsReward, levelBonus };
 }
 
+// EXPORTACIÓN CORRECTA
 export default router;
