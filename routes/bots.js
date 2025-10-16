@@ -87,14 +87,17 @@ router.post("/match", async (req, res) => {
    SIMULATE MATCH
    =============================== */
 router.post("/:matchId/simulate", async (req, res) => {
-  const matchId = parseInt(req.params.matchId, 10);
+  // CORRECCIÓN: El ID de la partida es un UUID (string), no un número.
+  // Se elimina la conversión con parseInt.
+  const { matchId } = req.params;
 
-  if (isNaN(matchId)) {
+  // Validamos que el ID no esté vacío.
+  if (!matchId) {
     return res.status(400).json({ error: "ID de partida inválido" });
   }
 
   try {
-    // 1. Obtener la partida
+    // 1. Obtener la partida usando el matchId como string
     const { data: match, error: matchError } = await supabase
       .from("matches")
       .select("id, player1_id, player2_id, status")
@@ -170,8 +173,8 @@ router.post("/:matchId/simulate", async (req, res) => {
         simulation.winnerId === player.id
             ? `¡Ganaste ${simulation.player1Score}-${simulation.player2Score}!`
             : simulation.player1Score === simulation.player2Score
-            ? `Empate ${simulation.player1Score}-${simulation.player2Score}`
-            : `Perdiste ${simulation.player1Score}-${simulation.player2Score}`;
+          ? `Perdiste ${simulation.player1Score}-${simulation.player2Score}`
+          : `Empate ${simulation.player1Score}-${simulation.player2Score}`;
 
 
     res.json({
