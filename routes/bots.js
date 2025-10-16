@@ -1,89 +1,3 @@
-// routes/bots.js
-import express from "express";
-import { supabase } from "../supabaseClient.js";
-
-const router = express.Router();
-
-/* ===============================
-   GET BOTS: Listar bots disponibles
-   =============================== */
-router.get("/", async (req, res) => {
-  try {
-    const { data: bots, error } = await supabase
-      .from("bots")
-      .select("*")
-      .order("level", { ascending: true });
-
-    if (error) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    res.json({ bots });
-  } catch (err) {
-    console.error("❌ Error obteniendo bots:", err);
-    return res.status(500).json({ error: "Error interno al obtener bots" });
-  }
-});
-
-/* ===============================
-   START BOT MATCH: Iniciar partida contra bot
-   =============================== */
-router.post("/match", async (req, res) => {
-  const { characterId, botId } = req.body;
-
-  try {
-    // Verificar personaje
-    const { data: character, error: charError } = await supabase
-      .from("characters")
-      .select("*")
-      .eq("id", characterId)
-      .single();
-
-    if (charError || !character) {
-      return res.status(404).json({ error: "Personaje no encontrado" });
-    }
-
-    // Obtener bot
-    const { data: bot, error: botError } = await supabase
-      .from("bots")
-      .select("*")
-      .eq("id", botId)
-      .single();
-
-    if (botError || !bot) {
-      return res.status(404).json({ error: "Bot no encontrado" });
-    }
-
-    // Crear partida contra bot
-    const { data: match, error: matchError } = await supabase
-      .from("matches")
-      .insert([
-        {
-          player1_id: characterId,
-          player2_id: botId,
-          match_type: "bot",
-          status: "in_progress",
-          started_at: new Date(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (matchError) {
-      return res.status(400).json({ error: matchError.message });
-    }
-
-    res.json({ 
-      match, 
-      bot,
-      message: `Partida contra ${bot.name} iniciada` 
-    });
-  } catch (err) {
-    console.error("❌ Error en bot match:", err);
-    return res.status(500).json({ error: "Error interno al iniciar partida" });
-  }
-});
-
 /* ===============================
    SIMULATE BOT MATCH: Simular resultado contra bot
    =============================== */
@@ -97,7 +11,7 @@ router.post("/:matchId/simulate", async (req, res) => {
       .select(`
         *,
         player1:player1_id(*),
-        bot:player2_id(*)
+        player2:player2_id(*)
       `)
       .eq("id", matchId)
       .single();
@@ -111,7 +25,7 @@ router.post("/:matchId/simulate", async (req, res) => {
     }
 
     // Simular partida
-    const simulation = simulateBotMatch(match.player1, match.bot);
+    const simulation = simulateBotMatch(match.player1, match.player2);
     
     // Actualizar partida con resultado
     const { data: updatedMatch, error: updateError } = await supabase
@@ -132,17 +46,23 @@ router.post("/:matchId/simulate", async (req, res) => {
     }
 
     // Dar recompensas si ganó
+    let rewards = null;
     if (simulation.winnerId === match.player1_id) {
-      await giveMatchRewards(match.player1_id, true, match.bot.level);
+      rewards = await giveMatchRewards(match.player1_id, true, match.player2.level);
     } else if (simulation.player1Score === simulation.player2Score) {
-      await giveMatchRewards(match.player1_id, false, match.bot.level); // Empate
+      rewards = await giveMatchRewards(match.player1_id, false, match.player2.level); // Empate
     }
 
     res.json({
       match: updatedMatch,
-      simulation,
+      simulation: {
+        ...simulation,
+        rewards
+      },
       message: simulation.winnerId === match.player1_id ? 
         `¡Ganaste ${simulation.player1Score}-${simulation.player2Score}!` :
+        simulation.player1Score === simulation.player2Score ?
+        `Empate ${simulation.player1Score}-${simulation.player2Score}` :
         `Perdiste ${simulation.player1Score}-${simulation.player2Score}`
     });
   } catch (err) {
@@ -152,23 +72,23 @@ router.post("/:matchId/simulate", async (req, res) => {
 });
 
 /* ===============================
-   FUNCIONES HELPER
+   FUNCIONES HELPER PARA SIMULACIÓN
    =============================== */
 
 // Simular partida contra bot
 function simulateBotMatch(player, bot) {
   // Calcular ventajas basadas en stats
-  const playerAvg = calculateAverageStats(player);
-  const botAvg = calculateAverageStats(bot);
+  const playerStats = calculateAverageStats(player);
+  const botStats = calculateAverageStats(bot);
   
   // Diferencia de nivel (afecta probabilidades)
-  const levelDiff = player.level - bot.level;
+  const levelDiff = (player.level || 1) - (bot.level || 1);
   
-  // Base de goles (entre 0 y 6)
+  // Base de goles (entre 0 y 5)
   const baseGoals = Math.floor(Math.random() * 3) + 1;
   
   // Calcular ventaja del jugador
-  let playerAdvantage = (playerAvg - botAvg) / 100; // 0.1 = 10% ventaja
+  let playerAdvantage = (playerStats - botStats) / 100; // 0.1 = 10% ventaja
   playerAdvantage += levelDiff * 0.1; // +10% por nivel de ventaja
   
   // Ajustar resultados basado en ventaja
@@ -272,5 +192,3 @@ async function giveMatchRewards(characterId, isWinner, botLevel) {
 
   return { expReward, coinsReward, levelBonus };
 }
-
-export default router;
