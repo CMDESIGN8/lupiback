@@ -75,23 +75,38 @@ router.post("/match", async (req, res) => {
 router.post("/:matchId/simulate", async (req, res) => {
   const { matchId } = req.params;
 
+  // Validar que matchId sea un número
+  if (isNaN(matchId)) {
+    return res.status(400).json({ error: "ID de partida inválido" });
+  }
+
   try {
-    const { data: match } = await supabase
+    const { data: match, error: matchError } = await supabase
       .from("matches")
       .select(`
         *,
         player1:player1_id(*),
         player2:player2_id(*)
       `)
-      .eq("id", matchId)
+      .eq("id", parseInt(matchId))
       .single();
 
-    if (!match) return res.status(404).json({ error: "Partida no encontrada" });
-    if (match.status !== "in_progress") return res.status(400).json({ error: "La partida ya terminó" });
+    if (matchError) {
+      console.error("❌ Error buscando partida:", matchError);
+      return res.status(404).json({ error: "Partida no encontrada" });
+    }
+
+    if (!match) {
+      return res.status(404).json({ error: "Partida no encontrada" });
+    }
+
+    if (match.status !== "in_progress") {
+      return res.status(400).json({ error: "La partida ya terminó" });
+    }
 
     const simulation = simulateBotMatch(match.player1, match.player2);
 
-    const { data: updatedMatch } = await supabase
+    const { data: updatedMatch, error: updateError } = await supabase
       .from("matches")
       .update({
         player1_score: simulation.player1Score,
@@ -100,9 +115,18 @@ router.post("/:matchId/simulate", async (req, res) => {
         status: "finished",
         finished_at: new Date(),
       })
-      .eq("id", matchId)
-      .select()
+      .eq("id", parseInt(matchId))
+      .select(`
+        *,
+        player1:player1_id(*),
+        player2:player2_id(*)
+      `)
       .single();
+
+    if (updateError) {
+      console.error("❌ Error actualizando partida:", updateError);
+      throw updateError;
+    }
 
     res.json({
       match: updatedMatch,
