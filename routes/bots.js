@@ -28,21 +28,35 @@ router.get("/", async (req, res) => {
 router.post("/match", async (req, res) => {
   const { characterId, botId } = req.body;
 
+  console.log("🎯 Creando partida:", { characterId, botId });
+
   try {
-    const { data: character } = await supabase
+    const { data: character, error: charError } = await supabase
       .from("characters")
       .select("*")
       .eq("id", characterId)
       .single();
 
-    const { data: bot } = await supabase
+    if (charError) {
+      console.error("❌ Error buscando personaje:", charError);
+      return res.status(404).json({ error: "Personaje no encontrado" });
+    }
+
+    const { data: bot, error: botError } = await supabase
       .from("bots")
       .select("*")
       .eq("id", botId)
       .single();
 
+    if (botError) {
+      console.error("❌ Error buscando bot:", botError);
+      return res.status(404).json({ error: "Bot no encontrado" });
+    }
+
     if (!character) return res.status(404).json({ error: "Personaje no encontrado" });
     if (!bot) return res.status(404).json({ error: "Bot no encontrado" });
+
+    console.log("✅ Personaje y bot encontrados");
 
     const { data: insertedMatches, error: matchError } = await supabase
       .from("matches")
@@ -57,12 +71,24 @@ router.post("/match", async (req, res) => {
       ])
       .select("*");
 
-    if (matchError) throw matchError;
+    if (matchError) {
+      console.error("❌ Error insertando partida:", matchError);
+      throw matchError;
+    }
 
     const match = insertedMatches?.[0];
-    console.log("✅ Match creado:", match);
+    console.log("✅ Match creado exitosamente:", {
+      id: match?.id,
+      player1_id: match?.player1_id,
+      player2_id: match?.player2_id,
+      tipo_id: typeof match?.id
+    });
 
-    res.json({ match, bot, message: `Partida contra ${bot.name} iniciada` });
+    res.json({ 
+      match, 
+      bot, 
+      message: `Partida contra ${bot.name} iniciada` 
+    });
   } catch (err) {
     console.error("❌ Error iniciando partida:", err);
     res.status(500).json({ error: "Error interno al iniciar partida" });
