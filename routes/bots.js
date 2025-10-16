@@ -192,3 +192,5 @@ async function giveMatchRewards(characterId, isWinner, botLevel) {
 
   return { expReward, coinsReward, levelBonus };
 }
+
+export default router;
