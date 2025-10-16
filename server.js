@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import characterRoutes from "./routes/characters.js";
+import botRoutes from "./routes/bots.js";
 
 dotenv.config();  
 
@@ -44,6 +45,7 @@ app.post("/characters", async (req, res) => {
 });
 
 app.use("/characters", characterRoutes);
+app.use("/bots", botRoutes);
 
 // Obtener personaje por user_id
 app.get("/characters/:userId", async (req, res) => {
