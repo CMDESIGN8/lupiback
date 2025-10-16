@@ -29,20 +29,19 @@ router.post("/match", async (req, res) => {
   const { characterId, botId } = req.body;
 
   try {
-    const { data: character } = await supabase
+    const { data: character, error: charError } = await supabase
       .from("characters")
       .select("*")
       .eq("id", characterId)
       .single();
+    if (charError || !character) return res.status(404).json({ error: "Personaje no encontrado" });
 
-    const { data: bot } = await supabase
+    const { data: bot, error: botError } = await supabase
       .from("bots")
       .select("*")
       .eq("id", botId)
       .single();
-
-    if (!character) return res.status(404).json({ error: "Personaje no encontrado" });
-    if (!bot) return res.status(404).json({ error: "Bot no encontrado" });
+    if (botError || !bot) return res.status(404).json({ error: "Bot no encontrado" });
 
     const { data: insertedMatches, error: matchError } = await supabase
       .from("matches")
@@ -59,9 +58,7 @@ router.post("/match", async (req, res) => {
 
     if (matchError) throw matchError;
 
-    const match = insertedMatches?.[0];
-    console.log("✅ Match creado:", match);
-
+    const match = insertedMatches[0]; // ✅ ID correcto del match
     res.json({ match, bot, message: `Partida contra ${bot.name} iniciada` });
   } catch (err) {
     console.error("❌ Error iniciando partida:", err);
