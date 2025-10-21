@@ -283,11 +283,11 @@ router.get("/history/:characterId", async (req, res) => { /* ... tu código exis
 // FUNCIONES AUXILIARES
 function getRewards(botLevel, playerLevel = 1, isWinner = true) {
   const baseExp = isWinner ? 150 : 75;
-  const baseCoins = isWinner ? 200 : 100;
+  const baseLupicoins = isWinner ? 200 : 100; // Cambiar nombre para claridad
   const levelBonus = Math.max(0, botLevel - playerLevel) * 0.15;
   return {
     exp: Math.round(baseExp * (1 + levelBonus)),
-    coins: Math.round(baseCoins * (1 + levelBonus)),
+    coins: Math.round(baseLupicoins * (1 + levelBonus)), // coins se refiere a lupicoins
   };
 }
 
