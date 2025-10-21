@@ -215,42 +215,48 @@ router.post("/:matchId/finish", async (req, res) => {
     console.log("✅ Personaje actualizado");
 
     // 6. Aplicar recompensas de monedas
-    console.log("💰 Procesando recompensas de monedas...");
-    const { data: wallet, error: walletError } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("character_id", player.id)
-      .single();
+    // 6. Aplicar recompensas de monedas
+console.log("💰 Procesando recompensas de monedas...");
+const { data: wallet, error: walletError } = await supabase
+  .from("wallets")
+  .select("*")
+  .eq("character_id", player.id)
+  .single();
 
-    if (walletError && walletError.code !== 'PGRST116') {
-      console.error("❌ Error buscando wallet:", walletError);
-      throw walletError;
-    }
+if (walletError && walletError.code !== 'PGRST116') {
+  console.error("❌ Error buscando wallet:", walletError);
+  throw walletError;
+}
 
-    if (wallet) {
-      // Actualizar wallet existente
-      const { error: updateWalletError } = await supabase
-        .from("wallets")
-        .update({ coins: (wallet.coins || 0) + rewards.coins })
-        .eq("character_id", player.id);
+if (wallet) {
+  // ✅ CORREGIDO: Usar lupicoins
+  const newLupicoins = (parseFloat(wallet.lupicoins) || 0) + rewards.coins;
+  const { error: updateWalletError } = await supabase
+    .from("wallets")
+    .update({ lupicoins: newLupicoins })
+    .eq("character_id", player.id);
 
-      if (updateWalletError) {
-        console.error("❌ Error actualizando wallet:", updateWalletError);
-        throw updateWalletError;
-      }
-      console.log("✅ Wallet actualizada");
-    } else {
-      // Crear nueva wallet
-      const { error: insertWalletError } = await supabase
-        .from("wallets")
-        .insert([{ character_id: player.id, coins: rewards.coins }]);
+  if (updateWalletError) {
+    console.error("❌ Error actualizando wallet:", updateWalletError);
+    throw updateWalletError;
+  }
+  console.log("✅ Wallet actualizada. Nuevos lupicoins:", newLupicoins);
+} else {
+  // ✅ CORREGIDO: Usar lupicoins y generar address
+  const { error: insertWalletError } = await supabase
+    .from("wallets")
+    .insert([{ 
+      character_id: player.id, 
+      lupicoins: rewards.coins,
+      address: `wallet_${player.id}_${Date.now()}`
+    }]);
 
-      if (insertWalletError) {
-        console.error("❌ Error creando wallet:", insertWalletError);
-        throw insertWalletError;
-      }
-      console.log("✅ Nueva wallet creada");
-    }
+  if (insertWalletError) {
+    console.error("❌ Error creando wallet:", insertWalletError);
+    throw insertWalletError;
+  }
+  console.log("✅ Nueva wallet creada con", rewards.coins, "lupicoins");
+}
 
     console.log("🎉 Partida finalizada exitosamente");
     res.json({
