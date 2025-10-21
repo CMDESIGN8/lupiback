@@ -102,12 +102,16 @@ router.post("/:matchId/finish", async (req, res) => {
   const { matchId } = req.params;
   const { player1Score, player2Score } = req.body;
 
+  console.log("🎯 FINISH MATCH recibido:", { matchId, player1Score, player2Score });
+
   if (!matchId || player1Score === undefined || player2Score === undefined) {
+    console.error("❌ Datos faltantes");
     return res.status(400).json({ error: "Faltan datos para finalizar la partida" });
   }
 
   try {
     // 1. Obtener la partida y validar
+    console.log("🔍 Buscando partida:", matchId);
     const { data: match, error: matchError } = await supabase
       .from("matches")
       .select("id, player1_id, player2_id, status")
@@ -115,28 +119,48 @@ router.post("/:matchId/finish", async (req, res) => {
       .single();
 
     if (matchError || !match) {
+      console.error("❌ Partida no encontrada:", matchError);
       return res.status(404).json({ error: "Partida no encontrada" });
     }
+    
+    console.log("📋 Partida encontrada:", match);
+
     if (match.status !== "in_progress") {
+      console.error("❌ Estado inválido:", match.status);
       return res.status(400).json({ error: "La partida no puede ser finalizada" });
     }
 
     // 2. Obtener datos de los participantes
+    console.log("👤 Buscando participantes...");
     const { data: player, error: playerError } = await supabase
       .from('characters').select('*').eq('id', match.player1_id).single();
+    
     const { data: bot, error: botError } = await supabase
       .from('bots').select('*').eq('id', match.player2_id).single();
 
     if (playerError || botError) {
+      console.error("❌ Error buscando participantes:", { playerError, botError });
       return res.status(404).json({ error: "No se pudieron encontrar los participantes" });
     }
+
+    console.log("✅ Participantes encontrados:", { 
+      player: player.nickname, 
+      bot: bot.name 
+    });
     
     // 3. Determinar ganador y calcular recompensas
     const winnerId = player1Score > player2Score ? player.id : (player2Score > player1Score ? bot.id : null);
     const isWinner = winnerId === player.id;
     const rewards = getRewards(bot.level, player.level, isWinner);
 
+    console.log("🏆 Resultado:", { 
+      score: `${player1Score}-${player2Score}`, 
+      winnerId, 
+      rewards 
+    });
+
     // 4. Actualizar la partida con el resultado
+    console.log("💾 Actualizando partida en BD...");
     const { data: updatedMatch, error: updateError } = await supabase
       .from("matches").update({
         player1_score: player1Score,
@@ -148,7 +172,12 @@ router.post("/:matchId/finish", async (req, res) => {
         rewards_coins: rewards.coins
       }).eq("id", matchId).select().single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("❌ Error actualizando partida:", updateError);
+      throw updateError;
+    }
+
+    console.log("✅ Partida actualizada:", updatedMatch);
 
     // 5. Aplicar EXP y sistema de niveles
     const newExperience = (player.experience || 0) + rewards.exp;
@@ -161,6 +190,13 @@ router.post("/:matchId/finish", async (req, res) => {
       newLevel++;
     }
 
+    console.log("📈 Experiencia y nivel:", {
+      oldExp: player.experience,
+      newExperience,
+      oldLevel: player.level,
+      newLevel
+    });
+
     // Actualizar personaje
     const { error: updateCharError } = await supabase
       .from("characters")
@@ -171,16 +207,25 @@ router.post("/:matchId/finish", async (req, res) => {
       })
       .eq("id", player.id);
 
-    if (updateCharError) throw updateCharError;
+    if (updateCharError) {
+      console.error("❌ Error actualizando personaje:", updateCharError);
+      throw updateCharError;
+    }
+
+    console.log("✅ Personaje actualizado");
 
     // 6. Aplicar recompensas de monedas
+    console.log("💰 Procesando recompensas de monedas...");
     const { data: wallet, error: walletError } = await supabase
       .from("wallets")
       .select("*")
       .eq("character_id", player.id)
       .single();
 
-    if (walletError && walletError.code !== 'PGRST116') throw walletError;
+    if (walletError && walletError.code !== 'PGRST116') {
+      console.error("❌ Error buscando wallet:", walletError);
+      throw walletError;
+    }
 
     if (wallet) {
       // Actualizar wallet existente
@@ -189,16 +234,25 @@ router.post("/:matchId/finish", async (req, res) => {
         .update({ coins: (wallet.coins || 0) + rewards.coins })
         .eq("character_id", player.id);
 
-      if (updateWalletError) throw updateWalletError;
+      if (updateWalletError) {
+        console.error("❌ Error actualizando wallet:", updateWalletError);
+        throw updateWalletError;
+      }
+      console.log("✅ Wallet actualizada");
     } else {
       // Crear nueva wallet
       const { error: insertWalletError } = await supabase
         .from("wallets")
         .insert([{ character_id: player.id, coins: rewards.coins }]);
 
-      if (insertWalletError) throw insertWalletError;
+      if (insertWalletError) {
+        console.error("❌ Error creando wallet:", insertWalletError);
+        throw insertWalletError;
+      }
+      console.log("✅ Nueva wallet creada");
     }
 
+    console.log("🎉 Partida finalizada exitosamente");
     res.json({
       message: "Partida finalizada y recompensas aplicadas.",
       matchResult: updatedMatch,
@@ -210,7 +264,10 @@ router.post("/:matchId/finish", async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error finalizando partida:", err);
-    res.status(500).json({ error: "Error interno al finalizar la partida" });
+    res.status(500).json({ 
+      error: "Error interno al finalizar la partida",
+      details: err.message 
+    });
   }
 });
 
