@@ -148,10 +148,13 @@ router.post("/:matchId/finish", async (req, res) => {
       bot: bot.name 
     });
     
-    // 3. Determinar ganador y calcular recompensas
+    // 3. Determinar ganador y calcular recompensas (CORREGIDO)
     const winnerId = player1Score > player2Score ? player.id : (player2Score > player1Score ? bot.id : null);
     const isWinner = winnerId === player.id;
-    const rewards = getRewards(bot.level, player.level, isWinner);
+    const isDraw = player1Score === player2Score;
+    
+    // ✅ SISTEMA DE RECOMPENSAS CORREGIDO - MENOS GENEROSO
+    const rewards = getBalancedRewards(bot.level, player.level || 1, isWinner, isDraw);
 
     console.log("🏆 Resultado:", { 
       score: `${player1Score}-${player2Score}`, 
@@ -179,22 +182,23 @@ router.post("/:matchId/finish", async (req, res) => {
 
     console.log("✅ Partida actualizada:", updatedMatch);
 
-    // 5. Aplicar EXP y sistema de niveles
+    // 5. ✅ SISTEMA DE NIVELES CORREGIDO - MÁS BALANCEADO
     const newExperience = (player.experience || 0) + rewards.exp;
-    let newLevel = player.level || 1;
-    let remainingExp = newExperience;
     
-    // Calcular nuevo nivel basado en EXP
-    while (remainingExp >= newLevel * 100) {
-      remainingExp -= newLevel * 100;
-      newLevel++;
-    }
+    // Calcular nuevo nivel con fórmula más exigente
+    const calculatedLevel = calculateLevel(newExperience);
+    const newLevel = Math.min(calculatedLevel, 50); // Límite máximo de nivel
+    
+    const leveledUp = newLevel > (player.level || 1);
+    const skillPointsGained = leveledUp ? 1 : 0;
 
     console.log("📈 Experiencia y nivel:", {
       oldExp: player.experience,
       newExperience,
       oldLevel: player.level,
-      newLevel
+      newLevel,
+      leveledUp,
+      skillPointsGained
     });
 
     // Actualizar personaje
@@ -203,7 +207,7 @@ router.post("/:matchId/finish", async (req, res) => {
       .update({
         experience: newExperience,
         level: newLevel,
-        available_skill_points: (player.available_skill_points || 0) + (newLevel > player.level ? 1 : 0)
+        available_skill_points: (player.available_skill_points || 0) + skillPointsGained
       })
       .eq("id", player.id);
 
@@ -214,58 +218,56 @@ router.post("/:matchId/finish", async (req, res) => {
 
     console.log("✅ Personaje actualizado");
 
-    // 6. Aplicar recompensas de monedas
-    // 6. Aplicar recompensas de monedas
-console.log("💰 Procesando recompensas de monedas...");
-const { data: wallet, error: walletError } = await supabase
-  .from("wallets")
-  .select("*")
-  .eq("character_id", player.id)
-  .single();
+    // 6. Aplicar recompensas de monedas (sin cambios)
+    console.log("💰 Procesando recompensas de monedas...");
+    const { data: wallet, error: walletError } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("character_id", player.id)
+      .single();
 
-if (walletError && walletError.code !== 'PGRST116') {
-  console.error("❌ Error buscando wallet:", walletError);
-  throw walletError;
-}
+    if (walletError && walletError.code !== 'PGRST116') {
+      console.error("❌ Error buscando wallet:", walletError);
+      throw walletError;
+    }
 
-if (wallet) {
-  // ✅ CORREGIDO: Usar lupicoins
-  const newLupicoins = (parseFloat(wallet.lupicoins) || 0) + rewards.coins;
-  const { error: updateWalletError } = await supabase
-    .from("wallets")
-    .update({ lupicoins: newLupicoins })
-    .eq("character_id", player.id);
+    if (wallet) {
+      const newLupicoins = (parseFloat(wallet.lupicoins) || 0) + rewards.coins;
+      const { error: updateWalletError } = await supabase
+        .from("wallets")
+        .update({ lupicoins: newLupicoins })
+        .eq("character_id", player.id);
 
-  if (updateWalletError) {
-    console.error("❌ Error actualizando wallet:", updateWalletError);
-    throw updateWalletError;
-  }
-  console.log("✅ Wallet actualizada. Nuevos lupicoins:", newLupicoins);
-} else {
-  // ✅ CORREGIDO: Usar lupicoins y generar address
-  const { error: insertWalletError } = await supabase
-    .from("wallets")
-    .insert([{ 
-      character_id: player.id, 
-      lupicoins: rewards.coins,
-      address: `wallet_${player.id}_${Date.now()}`
-    }]);
+      if (updateWalletError) {
+        console.error("❌ Error actualizando wallet:", updateWalletError);
+        throw updateWalletError;
+      }
+      console.log("✅ Wallet actualizada. Nuevos lupicoins:", newLupicoins);
+    } else {
+      const { error: insertWalletError } = await supabase
+        .from("wallets")
+        .insert([{ 
+          character_id: player.id, 
+          lupicoins: rewards.coins,
+          address: `wallet_${player.id}_${Date.now()}`
+        }]);
 
-  if (insertWalletError) {
-    console.error("❌ Error creando wallet:", insertWalletError);
-    throw insertWalletError;
-  }
-  console.log("✅ Nueva wallet creada con", rewards.coins, "lupicoins");
-}
+      if (insertWalletError) {
+        console.error("❌ Error creando wallet:", insertWalletError);
+        throw insertWalletError;
+      }
+      console.log("✅ Nueva wallet creada con", rewards.coins, "lupicoins");
+    }
 
     console.log("🎉 Partida finalizada exitosamente");
     res.json({
       message: "Partida finalizada y recompensas aplicadas.",
       matchResult: updatedMatch,
       rewards,
-      levelUp: newLevel > player.level,
+      levelUp: leveledUp,
       newLevel: newLevel,
-      newExperience: newExperience
+      newExperience: newExperience,
+      skillPointsGained: skillPointsGained
     });
 
   } catch (err) {
@@ -276,6 +278,64 @@ if (wallet) {
     });
   }
 });
+
+// ✅ FUNCIÓN CORREGIDA - SISTEMA DE RECOMPENSAS BALANCEADO
+function getBalancedRewards(botLevel, playerLevel = 1, isWinner = true, isDraw = false) {
+  // Base más conservadora
+  let baseExp, baseCoins;
+  
+  if (isDraw) {
+    baseExp = 25;
+    baseCoins = 30;
+  } else if (isWinner) {
+    baseExp = 50;  // Reducido de 150
+    baseCoins = 75; // Reducido de 200
+  } else {
+    baseExp = 15;  // Reducido de 75
+    baseCoins = 25; // Reducido de 100
+  }
+  
+  // Bonus por dificultad más conservador
+  const levelDifference = botLevel - playerLevel;
+  const difficultyBonus = Math.max(-0.5, Math.min(0.5, levelDifference * 0.1)); // Máximo ±50% bonus
+  
+  // Penalización por niveles altos (progresión más lenta)
+  const levelPenalty = playerLevel > 10 ? (playerLevel - 10) * 0.02 : 0;
+  
+  const finalExp = Math.round(baseExp * (1 + difficultyBonus - levelPenalty));
+  const finalCoins = Math.round(baseCoins * (1 + difficultyBonus - levelPenalty));
+  
+  return {
+    exp: Math.max(10, finalExp), // Mínimo 10 EXP
+    coins: Math.max(15, finalCoins) // Mínimo 15 monedas
+  };
+}
+
+// ✅ NUEVA FUNCIÓN - CÁLCULO DE NIVEL MÁS EXIGENTE
+function calculateLevel(experience) {
+  let level = 1;
+  let expRequired = 0;
+  let currentExp = experience;
+  
+  while (currentExp >= expRequired) {
+    // Fórmula exponencial: cada nivel requiere más EXP
+    expRequired = Math.floor(100 * Math.pow(1.15, level - 1));
+    
+    if (currentExp >= expRequired) {
+      currentExp -= expRequired;
+      level++;
+      
+      // Límite máximo de nivel
+      if (level >= 50) {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  
+  return level;
+}
 
 // GET HISTORIAL DE PARTIDAS (Sin cambios)
 router.get("/history/:characterId", async (req, res) => { /* ... tu código existente ... */ });
