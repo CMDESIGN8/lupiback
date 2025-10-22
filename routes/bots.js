@@ -311,30 +311,39 @@ function getBalancedRewards(botLevel, playerLevel = 1, isWinner = true, isDraw =
   };
 }
 
-// ✅ NUEVA FUNCIÓN - CÁLCULO DE NIVEL MÁS EXIGENTE
+// ✅ ALTERNATIVA - SISTEMA PROGRESIVO SIMPLE
 function calculateLevel(experience) {
-  let level = 1;
-  let expRequired = 0;
-  let currentExp = experience;
+  const exp = experience || 0;
   
-  while (currentExp >= expRequired) {
-    // Fórmula exponencial: cada nivel requiere más EXP
-    expRequired = Math.floor(100 * Math.pow(1.15, level - 1));
-    
-    if (currentExp >= expRequired) {
-      currentExp -= expRequired;
-      level++;
-      
-      // Límite máximo de nivel
-      if (level >= 50) {
-        break;
-      }
-    } else {
-      break;
+  // Tabla de niveles fija
+  const levelThresholds = [
+    0,    // Nivel 1: 0 EXP
+    100,  // Nivel 2: 100 EXP
+    250,  // Nivel 3: 250 EXP
+    450,  // Nivel 4: 450 EXP
+    700,  // Nivel 5: 700 EXP
+    1000, // Nivel 6: 1000 EXP
+    1350, // Nivel 7: 1350 EXP
+    1750, // Nivel 8: 1750 EXP
+    2200, // Nivel 9: 2200 EXP
+    2700, // Nivel 10: 2700 EXP
+    3250, // Nivel 11: 3250 EXP
+    3850, // Nivel 12: 3850 EXP
+    4500, // Nivel 13: 4500 EXP
+    5200, // Nivel 14: 5200 EXP
+    5950, // Nivel 15: 5950 EXP
+    6750  // Nivel 16: 6750 EXP
+    // Puedes agregar más niveles según necesites
+  ];
+  
+  // Encontrar el nivel máximo que puede alcanzar con la EXP actual
+  for (let level = levelThresholds.length - 1; level >= 1; level--) {
+    if (exp >= levelThresholds[level]) {
+      return level + 1; // +1 porque el array empieza en nivel 1
     }
   }
   
-  return level;
+  return 1; // Nivel por defecto
 }
 
 // GET HISTORIAL DE PARTIDAS (Sin cambios)
