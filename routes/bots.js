@@ -182,24 +182,23 @@ router.post("/:matchId/finish", async (req, res) => {
 
     console.log("✅ Partida actualizada:", updatedMatch);
 
-    // 5. ✅ SISTEMA DE NIVELES CORREGIDO - MÁS BALANCEADO
-    const newExperience = (player.experience || 0) + rewards.exp;
-    
-    // Calcular nuevo nivel con fórmula más exigente
-    const calculatedLevel = calculateLevel(newExperience);
-    const newLevel = Math.min(calculatedLevel, 50); // Límite máximo de nivel
-    
-    const leveledUp = newLevel > (player.level || 1);
-    const skillPointsGained = leveledUp ? 1 : 0;
+    // 5. ✅ SISTEMA DE NIVELES CORREGIDO - FIJADO
+const newExperience = (player.experience || 0) + rewards.exp;
 
-    console.log("📈 Experiencia y nivel:", {
-      oldExp: player.experience,
-      newExperience,
-      oldLevel: player.level,
-      newLevel,
-      leveledUp,
-      skillPointsGained
-    });
+// Calcular nuevo nivel con el sistema fijo
+const newLevel = calculateLevel(newExperience);
+const oldLevel = player.level || 1;
+const leveledUp = newLevel > oldLevel;
+const skillPointsGained = leveledUp ? (newLevel - oldLevel) : 0; // Para múltiples niveles
+
+console.log("📈 Experiencia y nivel:", {
+  oldExp: player.experience,
+  newExperience,
+  oldLevel: oldLevel,
+  newLevel,
+  leveledUp,
+  skillPointsGained
+});
 
     // Actualizar personaje
     const { error: updateCharError } = await supabase
@@ -279,35 +278,40 @@ router.post("/:matchId/finish", async (req, res) => {
   }
 });
 
-// ✅ FUNCIÓN CORREGIDA - SISTEMA DE RECOMPENSAS BALANCEADO
+// ✅ FUNCIÓN MEJORADA - SISTEMA DE RECOMPENSAS CLARO
 function getBalancedRewards(botLevel, playerLevel = 1, isWinner = true, isDraw = false) {
-  // Base más conservadora
+  // Sistema base más simple
   let baseExp, baseCoins;
   
   if (isDraw) {
-    baseExp = 25;
-    baseCoins = 30;
+    baseExp = 30;
+    baseCoins = 40;
   } else if (isWinner) {
-    baseExp = 50;  // Reducido de 150
-    baseCoins = 75; // Reducido de 200
+    baseExp = 60;
+    baseCoins = 80;
   } else {
-    baseExp = 15;  // Reducido de 75
-    baseCoins = 25; // Reducido de 100
+    baseExp = 20;
+    baseCoins = 30;
   }
   
-  // Bonus por dificultad más conservador
+  // Bonus por dificultad moderado
   const levelDifference = botLevel - playerLevel;
-  const difficultyBonus = Math.max(-0.5, Math.min(0.5, levelDifference * 0.1)); // Máximo ±50% bonus
+  let difficultyMultiplier = 1.0;
   
-  // Penalización por niveles altos (progresión más lenta)
-  const levelPenalty = playerLevel > 10 ? (playerLevel - 10) * 0.02 : 0;
+  if (levelDifference > 0) {
+    // Bonus por enfrentar bots más fuertes
+    difficultyMultiplier += Math.min(0.5, levelDifference * 0.1);
+  } else if (levelDifference < 0) {
+    // Pequeña penalización por bots más débiles
+    difficultyMultiplier += Math.max(-0.2, levelDifference * 0.05);
+  }
   
-  const finalExp = Math.round(baseExp * (1 + difficultyBonus - levelPenalty));
-  const finalCoins = Math.round(baseCoins * (1 + difficultyBonus - levelPenalty));
+  const finalExp = Math.round(baseExp * difficultyMultiplier);
+  const finalCoins = Math.round(baseCoins * difficultyMultiplier);
   
   return {
-    exp: Math.max(10, finalExp), // Mínimo 10 EXP
-    coins: Math.max(15, finalCoins) // Mínimo 15 monedas
+    exp: Math.max(15, finalExp),
+    coins: Math.max(20, finalCoins)
   };
 }
 
