@@ -1,13 +1,16 @@
+// ✅ backend/routes/bots.js
 import express from "express";
 import { supabase } from "../supabaseClient.js";
 
 const router = express.Router();
 
-// ✅ AGREGAR ESTA RUTA QUE FALTA - GET BOTS
+/* ===============================
+   GET BOTS
+   =============================== */
 router.get("/", async (req, res) => {
   try {
     console.log("📍 GET /bots - Buscando bots en Supabase...");
-    
+
     const { data: bots, error } = await supabase
       .from("bots")
       .select("*")
@@ -19,16 +22,15 @@ router.get("/", async (req, res) => {
     }
 
     console.log(`✅ Encontrados ${bots.length} bots`);
-    res.json({ 
+    res.json({
       success: true,
-      bots: bots 
+      bots: bots,
     });
-    
   } catch (error) {
     console.error("❌ Error en GET /bots:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Error interno del servidor",
-      details: error.message 
+      details: error.message,
     });
   }
 });
@@ -38,21 +40,17 @@ router.get("/", async (req, res) => {
    =============================== */
 router.post("/match", async (req, res) => {
   const { characterId, botId } = req.body;
-
   console.log("🎯 Iniciando partida contra bot:", { characterId, botId });
 
   try {
-    // Validar que los IDs existan
     const { data: character, error: charError } = await supabase
       .from("characters")
       .select("id, user_id, nickname")
       .eq("id", characterId)
       .single();
 
-    if (charError || !character) {
-      console.error("❌ Personaje no encontrado:", charError);
+    if (charError || !character)
       return res.status(404).json({ error: "Personaje no encontrado" });
-    }
 
     const { data: bot, error: botError } = await supabase
       .from("bots")
@@ -60,12 +58,9 @@ router.post("/match", async (req, res) => {
       .eq("id", botId)
       .single();
 
-    if (botError || !bot) {
-      console.error("❌ Bot no encontrado:", botError);
+    if (botError || !bot)
       return res.status(404).json({ error: "Bot no encontrado" });
-    }
 
-    // Crear partida
     const { data: insertedMatch, error: matchError } = await supabase
       .from("matches")
       .insert({
@@ -77,23 +72,20 @@ router.post("/match", async (req, res) => {
       .select("id, created_at")
       .single();
 
-    if (matchError) {
-      console.error("❌ Error creando partida:", matchError);
-      throw matchError;
-    }
+    if (matchError) throw matchError;
 
     console.log("✅ Partida creada:", insertedMatch.id);
-    res.json({ 
+    res.json({
       success: true,
-      match: insertedMatch, 
-      bot, 
-      message: `Partida contra ${bot.name} iniciada` 
+      match: insertedMatch,
+      bot,
+      message: `Partida contra ${bot.name} iniciada`,
     });
   } catch (err) {
     console.error("❌ Error iniciando partida:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Error interno al iniciar partida" 
+      error: "Error interno al iniciar partida",
     });
   }
 });
@@ -108,79 +100,57 @@ router.post("/:matchId/finish", async (req, res) => {
   console.log("🎯 Finalizando partida:", { matchId, player1Score, player2Score });
 
   if (!matchId || player1Score === undefined || player2Score === undefined) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      error: "Faltan datos para finalizar la partida" 
+      error: "Faltan datos para finalizar la partida",
     });
   }
 
   try {
-    // 1. Obtener y validar partida
-    console.log("🔍 Buscando partida:", matchId);
     const { data: match, error: matchError } = await supabase
       .from("matches")
       .select("id, player1_id, player2_id, status")
       .eq("id", matchId)
       .single();
 
-    if (matchError || !match) {
-      console.error("❌ Partida no encontrada:", matchError);
-      return res.status(404).json({ 
-        success: false,
-        error: "Partida no encontrada" 
-      });
-    }
+    if (matchError || !match)
+      return res.status(404).json({ success: false, error: "Partida no encontrada" });
 
-    if (match.status !== "in_progress") {
-      return res.status(400).json({ 
-        success: false,
-        error: "La partida no puede ser finalizada" 
-      });
-    }
+    if (match.status !== "in_progress")
+      return res.status(400).json({ success: false, error: "La partida no puede ser finalizada" });
 
-    // 2. Obtener participantes
-    console.log("👤 Buscando participantes...");
     const { data: player, error: playerError } = await supabase
-      .from('characters')
-      .select('*')
-      .eq('id', match.player1_id)
+      .from("characters")
+      .select("*")
+      .eq("id", match.player1_id)
       .single();
-    
+
     const { data: bot, error: botError } = await supabase
-      .from('bots')
-      .select('*')
-      .eq('id', match.player2_id)
+      .from("bots")
+      .select("*")
+      .eq("id", match.player2_id)
       .single();
 
-    if (playerError || botError) {
-      console.error("❌ Error buscando participantes:", { playerError, botError });
-      return res.status(404).json({ 
-        success: false,
-        error: "No se pudieron encontrar los participantes" 
-      });
-    }
+    if (playerError || botError)
+      return res.status(404).json({ success: false, error: "No se pudieron encontrar los participantes" });
 
-    console.log("✅ Participantes encontrados:", { 
-      player: player.nickname, 
-      bot: bot.name 
-    });
-    
-    // 3. Determinar ganador y recompensas
+    console.log("✅ Participantes encontrados:", { player: player.nickname, bot: bot.name });
+
+    // Resultado y recompensas
     const isDraw = player1Score === player2Score;
     const isWinner = !isDraw && player1Score > player2Score;
     const winnerId = isDraw ? null : (isWinner ? player.id : bot.id);
-    
+
     const rewards = calculateRewards(bot.level, player.level || 1, isWinner, isDraw);
 
-    console.log("🏆 Resultado:", { 
+    console.log("🏆 Resultado:", {
       score: `${player1Score}-${player2Score}`,
-      winner: isWinner ? player.nickname : (isDraw ? 'Empate' : bot.name),
-      rewards 
+      winner: isWinner ? player.nickname : (isDraw ? "Empate" : bot.name),
+      rewards,
     });
 
-    // 4. Actualizar partida
-    console.log("💾 Actualizando partida en BD...");
-    const { data: updatedMatch, error: updateError } = await supabase
+    // Actualizar partida
+    await supabase
       .from("matches")
       .update({
         player1_score: player1Score,
@@ -189,51 +159,45 @@ router.post("/:matchId/finish", async (req, res) => {
         status: "finished",
         finished_at: new Date(),
         rewards_exp: rewards.exp,
-        rewards_coins: rewards.coins
+        rewards_coins: rewards.coins,
       })
-      .eq("id", matchId)
-      .select()
-      .single();
+      .eq("id", matchId);
 
-    if (updateError) {
-      console.error("❌ Error actualizando partida:", updateError);
-      throw updateError;
+    // 📈 Sistema de niveles corregido
+    const newExperience = (player.experience || 0) + rewards.exp;
+    const { newLevel, leveledUp, levelsGained } = calculatePlayerLevel(
+      newExperience,
+      player.level || 1
+    );
+
+    // 🔒 Prevención de downgrade
+    let finalLevel = newLevel;
+    if (newLevel < player.level) {
+      console.warn("⚠️ Nivel recalculado menor que el actual, manteniendo nivel anterior");
+      finalLevel = player.level;
     }
 
-    console.log("✅ Partida actualizada:", updatedMatch.id);
-
-    // 5. ✅ SISTEMA DE NIVELES CORREGIDO
-    const newExperience = (player.experience || 0) + rewards.exp;
-    const { newLevel, leveledUp, levelsGained } = calculatePlayerLevel(newExperience, player.level || 1);
-    
     console.log("📈 Progreso de nivel:", {
       experienciaAnterior: player.experience,
       experienciaNueva: newExperience,
       nivelAnterior: player.level,
-      nivelNuevo: newLevel,
-      subioNivel: leveledUp,
-      nivelesGanados: levelsGained
+      nivelNuevo: finalLevel,
+      subioNivel: finalLevel > player.level,
+      nivelesGanados: levelsGained,
     });
 
     // Actualizar personaje
-    const { error: updateCharError } = await supabase
+    await supabase
       .from("characters")
       .update({
         experience: newExperience,
-        level: newLevel,
-        available_skill_points: (player.available_skill_points || 0) + (leveledUp ? levelsGained : 0)
+        level: finalLevel,
+        available_skill_points:
+          (player.available_skill_points || 0) + (finalLevel > player.level ? levelsGained : 0),
       })
       .eq("id", player.id);
 
-    if (updateCharError) {
-      console.error("❌ Error actualizando personaje:", updateCharError);
-      throw updateCharError;
-    }
-
-    console.log("✅ Personaje actualizado");
-
-    // 6. Procesar recompensas de monedas
-    console.log("💰 Procesando recompensas de monedas...");
+    // Monedas
     const { data: wallet, error: walletError } = await supabase
       .from("wallets")
       .select("lupicoins")
@@ -242,35 +206,24 @@ router.post("/:matchId/finish", async (req, res) => {
 
     let newLupicoins = rewards.coins;
 
-    if (walletError && walletError.code !== 'PGRST116') {
-      console.error("❌ Error buscando wallet:", walletError);
-      throw walletError;
-    }
+    if (walletError && walletError.code !== "PGRST116") throw walletError;
 
     if (wallet) {
       newLupicoins = (parseFloat(wallet.lupicoins) || 0) + rewards.coins;
-      const { error: updateWalletError } = await supabase
+      await supabase
         .from("wallets")
         .update({ lupicoins: newLupicoins })
         .eq("character_id", player.id);
-
-      if (updateWalletError) {
-        console.error("❌ Error actualizando wallet:", updateWalletError);
-        throw updateWalletError;
-      }
     } else {
-      const { error: insertWalletError } = await supabase
+      await supabase
         .from("wallets")
-        .insert([{ 
-          character_id: player.id, 
-          lupicoins: rewards.coins,
-          address: `wallet_${player.id}_${Date.now()}`
-        }]);
-
-      if (insertWalletError) {
-        console.error("❌ Error creando wallet:", insertWalletError);
-        throw insertWalletError;
-      }
+        .insert([
+          {
+            character_id: player.id,
+            lupicoins: rewards.coins,
+            address: `wallet_${player.id}_${Date.now()}`,
+          },
+        ]);
     }
 
     console.log("✅ Wallet actualizada. Nuevos lupicoins:", newLupicoins);
@@ -281,41 +234,41 @@ router.post("/:matchId/finish", async (req, res) => {
       message: "Partida finalizada y recompensas aplicadas.",
       matchResult: {
         score: `${player1Score}-${player2Score}`,
-        winner: isWinner ? player.nickname : (isDraw ? 'Empate' : bot.name),
+        winner: isWinner ? player.nickname : (isDraw ? "Empate" : bot.name),
         isDraw,
-        isWinner
+        isWinner,
       },
       rewards,
       progression: {
         oldExperience: player.experience,
         newExperience,
-        oldLevel: player.level || 1,
-        newLevel,
-        leveledUp,
-        levelsGained: leveledUp ? levelsGained : 0,
-        skillPointsGained: leveledUp ? levelsGained : 0
+        oldLevel: player.level,
+        newLevel: finalLevel,
+        leveledUp: finalLevel > player.level,
+        levelsGained: finalLevel > player.level ? levelsGained : 0,
+        skillPointsGained: finalLevel > player.level ? levelsGained : 0,
       },
       wallet: {
         coinsEarned: rewards.coins,
-        totalCoins: newLupicoins
-      }
+        totalCoins: newLupicoins,
+      },
     });
-
   } catch (err) {
     console.error("❌ Error finalizando partida:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: "Error interno al finalizar la partida",
-      details: err.message 
+      details: err.message,
     });
   }
 });
 
-// ✅ FUNCIÓN ÚNICA Y MEJORADA PARA RECOMPENSAS
+/* ===============================
+   FUNCIONES DE CÁLCULO
+   =============================== */
 function calculateRewards(botLevel, playerLevel = 1, isWinner = true, isDraw = false) {
-  // Sistema base balanceado
   let baseExp, baseCoins;
-  
+
   if (isDraw) {
     baseExp = 25;
     baseCoins = 35;
@@ -326,53 +279,38 @@ function calculateRewards(botLevel, playerLevel = 1, isWinner = true, isDraw = f
     baseExp = 15;
     baseCoins = 25;
   }
-  
-  // Bonus/penalización por diferencia de nivel
+
   const levelDifference = botLevel - playerLevel;
   let difficultyMultiplier = 1.0;
-  
+
   if (levelDifference > 0) {
-    // Bonus por enfrentar bots más fuertes (máximo +50%)
     difficultyMultiplier += Math.min(0.5, levelDifference * 0.1);
   } else if (levelDifference < 0) {
-    // Pequeña penalización por bots más débiles (máximo -20%)
     difficultyMultiplier += Math.max(-0.2, levelDifference * 0.05);
   }
-  
+
   const finalExp = Math.round(baseExp * difficultyMultiplier);
   const finalCoins = Math.round(baseCoins * difficultyMultiplier);
-  
+
   return {
-    exp: Math.max(10, finalExp),        // Mínimo 10 EXP
-    coins: Math.max(15, finalCoins)     // Mínimo 15 monedas
+    exp: Math.max(10, finalExp),
+    coins: Math.max(15, finalCoins),
   };
 }
 
-// ✅ SISTEMA DE NIVELES CORREGIDO Y SIMPLIFICADO
+// ✅ SISTEMA DE NIVELES ESCALABLE (hasta nivel 100)
 function calculatePlayerLevel(experience, currentLevel = 1) {
   const exp = experience || 0;
-  
-  // Tabla de niveles progresiva pero alcanzable
-  const levelThresholds = [
-    0,     // Nivel 1: 0 EXP
-    100,   // Nivel 2: 100 EXP
-    220,   // Nivel 3: 220 EXP  
-    360,   // Nivel 4: 360 EXP
-    520,   // Nivel 5: 520 EXP
-    700,   // Nivel 6: 700 EXP
-    900,   // Nivel 7: 900 EXP
-    1120,  // Nivel 8: 1120 EXP
-    1360,  // Nivel 9: 1360 EXP
-    1620,  // Nivel 10: 1620 EXP
-    1900,  // Nivel 11: 1900 EXP
-    2200,  // Nivel 12: 2200 EXP
-    2520,  // Nivel 13: 2520 EXP
-    2860,  // Nivel 14: 2860 EXP
-    3220,  // Nivel 15: 3220 EXP
-    3600   // Nivel 16: 3600 EXP
-  ];
-  
-  // Calcular nuevo nivel
+
+  // Genera tabla progresiva
+  const levelThresholds = [0];
+  let next = 100;
+  for (let i = 1; i <= 100; i++) {
+    levelThresholds.push(Math.round(levelThresholds[i - 1] + next));
+    next *= 1.05;
+  }
+
+  // Buscar nivel alcanzado
   let newLevel = 1;
   for (let i = levelThresholds.length - 1; i >= 0; i--) {
     if (exp >= levelThresholds[i]) {
@@ -380,21 +318,18 @@ function calculatePlayerLevel(experience, currentLevel = 1) {
       break;
     }
   }
-  
+
   const leveledUp = newLevel > currentLevel;
-  const levelsGained = leveledUp ? (newLevel - currentLevel) : 0;
-  
-  return {
-    newLevel,
-    leveledUp,
-    levelsGained
-  };
+  const levelsGained = leveledUp ? newLevel - currentLevel : 0;
+
+  return { newLevel, leveledUp, levelsGained };
 }
 
-// GET HISTORIAL DE PARTIDAS (mantener tu implementación existente)
+/* ===============================
+   HISTORIAL DE PARTIDAS
+   =============================== */
 router.get("/history/:characterId", async (req, res) => {
   const { characterId } = req.params;
-  
   try {
     const { data: matches, error } = await supabase
       .from("matches")
@@ -410,15 +345,12 @@ router.get("/history/:characterId", async (req, res) => {
 
     if (error) throw error;
 
-    res.json({
-      success: true,
-      matches: matches || []
-    });
+    res.json({ success: true, matches: matches || [] });
   } catch (error) {
     console.error("❌ Error obteniendo historial:", error);
     res.status(500).json({
       success: false,
-      error: "Error al obtener historial de partidas"
+      error: "Error al obtener historial de partidas",
     });
   }
 });
