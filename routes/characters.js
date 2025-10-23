@@ -5,6 +5,93 @@ import { supabase } from "../supabaseClient.js";
 const router = express.Router();
 
 /* ===============================
+   CREATE: Crear nuevo personaje
+   =============================== */
+router.post("/", async (req, res) => {
+  const {
+    user_id,
+    name,
+    position,
+    velocidad = 50,
+    pase = 50,
+    tiro = 50,
+    defensa = 50,
+    resistencia_base = 50,
+    inteligencia = 50,
+  } = req.body;
+
+  try {
+    if (!user_id || !name)
+      return res.status(400).json({ error: "Faltan campos obligatorios" });
+
+    // ✅ 1️⃣ Verificar si el usuario existe en profiles
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user_id)
+      .maybeSingle();
+
+    if (profileError)
+      return res.status(500).json({ error: "Error verificando usuario" });
+
+    // ✅ 2️⃣ Si no existe, crearlo automáticamente
+    let profileId = user_id;
+    if (!profile) {
+      const { error: createProfileError } = await supabase
+        .from("profiles")
+        .insert([{ id: user_id, created_at: new Date().toISOString() }]);
+
+      if (createProfileError)
+        return res.status(500).json({
+          error: "No se pudo crear el perfil automáticamente",
+          details: createProfileError.message,
+        });
+    }
+
+    // ✅ 3️⃣ Crear personaje vinculado
+    const { data: newCharacter, error: insertError } = await supabase
+      .from("characters")
+      .insert([
+        {
+          user_id: profileId,
+          name,
+          position,
+          velocidad,
+          pase,
+          tiro,
+          defensa,
+          resistencia_base,
+          inteligencia,
+          level: 1,
+          experience: 0,
+          experience_to_next_level: 100,
+          available_skill_points: 0,
+        },
+      ])
+      .select()
+      .single();
+
+    if (insertError)
+      return res.status(400).json({ error: insertError.message });
+
+    // ✅ 4️⃣ Crear wallet asociada automáticamente
+    const { data: wallet, error: walletError } = await supabase
+      .from("wallets")
+      .insert([{ character_id: newCharacter.id, lupicoins: 0 }])
+      .select()
+      .single();
+
+    if (walletError)
+      console.warn("⚠️ No se pudo crear la wallet automáticamente:", walletError.message);
+
+    return res.json({ character: newCharacter, wallet });
+  } catch (err) {
+    console.error("❌ Error creando personaje:", err);
+    return res.status(500).json({ error: "Error interno al crear personaje" });
+  }
+});
+
+/* ===============================
    SISTEMA DE EXPERIENCIA GLOBAL
    =============================== */
 function calculatePlayerLevel(experience, currentLevel = 1) {
