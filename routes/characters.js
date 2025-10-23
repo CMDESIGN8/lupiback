@@ -10,7 +10,7 @@ const router = express.Router();
 router.post("/", async (req, res) => {
   const {
     user_id,
-    name,
+    nickname,
     position = 'delantero',
     velocidad = 50,
     pase = 50,
