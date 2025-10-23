@@ -14,6 +14,7 @@ function xpForLevel(level) {
 /* ===============================
    TRAIN: Entrenar personaje
    =============================== */
+// ✅ Nueva versión compatible con sistema global de experiencia
 router.post("/:id/train", async (req, res) => {
   const { id } = req.params;
 
@@ -36,25 +37,19 @@ router.post("/:id/train", async (req, res) => {
     if (walletError || !wallet)
       return res.status(404).json({ error: "Wallet no encontrada" });
 
-    let newExp = char.experience + 100;
-    let newLevel = char.level;
-    let newSkillPoints = char.available_skill_points || 0;
-    let expNeeded = xpForLevel(newLevel);
+    // Sumar XP total (acumulativo)
+    const newExperience = (char.experience || 0) + 100;
 
-    // subir de nivel progresivo
-    while (newExp >= expNeeded) {
-      newExp -= expNeeded;
-      newLevel++;
-      newSkillPoints += 5;
-      expNeeded = xpForLevel(newLevel);
-    }
+    // Reusar el mismo cálculo de bots.js para mantener coherencia
+    const { newLevel, leveledUp, levelsGained } = calculatePlayerLevel(newExperience, char.level || 1);
+
+    const newSkillPoints = (char.available_skill_points || 0) + (levelsGained * 5);
 
     const { data: updatedChar, error: updateError } = await supabase
       .from("characters")
       .update({
-        experience: newExp,
+        experience: newExperience,
         level: newLevel,
-        experience_to_next_level: expNeeded,
         available_skill_points: newSkillPoints,
       })
       .eq("id", id)
@@ -77,13 +72,40 @@ router.post("/:id/train", async (req, res) => {
     return res.json({
       character: updatedChar,
       wallet: updatedWallet,
-      leveledUp: newLevel > char.level,
+      leveledUp,
     });
   } catch (err) {
     console.error("❌ Error en train:", err);
     return res.status(500).json({ error: "Error interno en entrenamiento" });
   }
 });
+
+/* ===============================
+   Copiar esta función del bots.js
+   =============================== */
+function calculatePlayerLevel(experience, currentLevel = 1) {
+  const exp = experience || 0;
+
+  const levelThresholds = [0];
+  let next = 100;
+  for (let i = 1; i <= 100; i++) {
+    levelThresholds.push(Math.round(levelThresholds[i - 1] + next));
+    next *= 1.05;
+  }
+
+  let newLevel = 1;
+  for (let i = levelThresholds.length - 1; i >= 0; i--) {
+    if (exp >= levelThresholds[i]) {
+      newLevel = i + 1;
+      break;
+    }
+  }
+
+  const leveledUp = newLevel > currentLevel;
+  const levelsGained = leveledUp ? newLevel - currentLevel : 0;
+
+  return { newLevel, leveledUp, levelsGained };
+}
 
 /* ===============================
    STAT: Subir un skill individual
