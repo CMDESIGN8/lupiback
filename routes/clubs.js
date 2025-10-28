@@ -240,16 +240,30 @@ router.patch("/:clubId/members/:characterId/role", async (req, res) => {
 });
 
 // Helper function
+// Función auxiliar mejorada
 async function getCharacterByUserId(userId) {
-  const { data, error } = await supabase
-    .from('characters')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+  try {
+    console.log('🔍 Buscando personaje para user_id:', userId);
+    
+    const { data, error } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-  if (error) return null;
-  return data;
+    if (error) {
+      console.error('❌ Error buscando personaje:', error);
+      return null;
+    }
+
+    console.log('✅ Personaje encontrado:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en getCharacterByUserId:', error);
+    return null;
+  }
 }
 
 export default router;
+
 
