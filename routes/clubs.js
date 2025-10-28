@@ -7,14 +7,22 @@ const router = express.Router();
 /* ===============================
    CREAR NUEVO CLUB
    =============================== */
+/* ===============================
+   CREAR NUEVO CLUB
+   =============================== */
 router.post("/", async (req, res) => {
   try {
+    console.log('🎯 POST /clubs - Datos recibidos:', req.body);
+    
     const { name, description, logo_url, is_public, user_id } = req.body;
 
     if (!name || !user_id) {
+      console.log('❌ Datos faltantes:', { name, user_id });
       return res.status(400).json({ error: "Nombre y user_id son requeridos" });
     }
 
+    console.log('✅ Datos válidos, creando club...');
+    
     const club = await Club.create({
       name,
       description,
@@ -23,14 +31,19 @@ router.post("/", async (req, res) => {
       created_by: user_id
     });
 
+    console.log('✅ Club creado:', club);
+
     // El creador automáticamente se convierte en admin
     const character = await getCharacterByUserId(user_id);
+    console.log('🔍 Personaje encontrado:', character);
+    
     if (character) {
       await ClubMember.joinClub({
         club_id: club.id,
         character_id: character.id,
         role: 'admin'
       });
+      console.log('✅ Usuario agregado como admin del club');
     }
 
     res.status(201).json({
@@ -239,3 +252,4 @@ async function getCharacterByUserId(userId) {
 }
 
 export default router;
+
