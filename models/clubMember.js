@@ -154,6 +154,21 @@ export class ClubMember {
     return data;
   }
 
+  static async findByClubAndCharacter(clubId, characterId) {
+  const { data, error } = await supabase
+    .from('club_members')
+    .select('*')
+    .eq('club_id', clubId)
+    .eq('character_id', characterId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    throw error;
+  }
+  
+  return data; // Retorna null si no encuentra
+}
+
   static async resetWeeklyContributions() {
     // Esto se ejecutaría semanalmente via cron job
     const { error } = await supabase
@@ -164,4 +179,19 @@ export class ClubMember {
     if (error) throw error;
     return true;
   }
+  static async getAdmins(clubId) {
+  const { data, error } = await supabase
+    .from('club_members')
+    .select(`
+      *,
+      characters (
+        nickname
+      )
+    `)
+    .eq('club_id', clubId)
+    .eq('role', 'admin');
+
+  if (error) throw error;
+  return data;
+}
 }
