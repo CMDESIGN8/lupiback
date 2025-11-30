@@ -106,8 +106,11 @@ const getExpToNextLevel = (level) => {
 // ======================================
 app.post("/characters/train", async (req, res) => {
     try {
-        // Necesitas el ID del personaje y la cantidad de EXP base (la ganancia base)
-        const { characterId, expGained } = req.body; 
+        // 1. EXTRACT FROM PARAMS AND BODY
+        // 🔑 El characterId ahora se extrae de los parámetros de la URL
+        const { characterId } = req.params; 
+        // La EXP se sigue enviando en el cuerpo del POST
+        const { expGained } = req.body;     
 
         if (!characterId || typeof expGained !== 'number') {
             return res.status(400).json({ error: "Faltan characterId o expGained válidos." });
