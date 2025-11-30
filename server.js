@@ -92,45 +92,6 @@ app.post("/characters", async (req, res) => {
   }
 });
 
-// Rutas principales
-app.use("/characters", characterRoutes);
-app.use("/bots", botRoutes);
-app.use("/clubs", clubRoutes);
-
-// Obtener personaje por user_id
-app.get("/characters/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { data, error } = await supabase
-      .from("characters")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Wallet por personaje
-app.get("/wallets/:characterId", async (req, res) => {
-  try {
-    const { characterId } = req.params;
-    const { data, error } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("character_id", characterId)
-      .maybeSingle();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ======================================
 // ⭐️ FUNCIÓN HELPER PARA LA PROGRESIÓN (REGLA DEL JUEGO)
 // Define la misma fórmula que usaste en el cliente
@@ -211,6 +172,45 @@ app.post("/characters/train", async (req, res) => {
         console.error('❌ Error en /characters/train:', error);
         res.status(500).json({ error: 'Error interno del servidor.', message: error.message });
     }
+});
+
+// Rutas principales
+app.use("/characters", characterRoutes);
+app.use("/bots", botRoutes);
+app.use("/clubs", clubRoutes);
+
+// Obtener personaje por user_id
+app.get("/characters/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { data, error } = await supabase
+      .from("characters")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Wallet por personaje
+app.get("/wallets/:characterId", async (req, res) => {
+  try {
+    const { characterId } = req.params;
+    const { data, error } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("character_id", characterId)
+      .maybeSingle();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Manejo de errores global
