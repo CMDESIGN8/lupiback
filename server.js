@@ -131,6 +131,88 @@ app.get("/wallets/:characterId", async (req, res) => {
   }
 });
 
+// ======================================
+// ⭐️ FUNCIÓN HELPER PARA LA PROGRESIÓN (REGLA DEL JUEGO)
+// Define la misma fórmula que usaste en el cliente
+// ======================================
+const getExpToNextLevel = (level) => {
+    // FÓRMULA DE EJEMPLO: 100 + Nivel * 50 * (Nivel / 2)
+    return Math.floor(100 + level * 50 * (level / 2));
+};
+
+// ======================================
+// ⭐️ NUEVO ENDPOINT SEGURO PARA EL ENTRENAMIENTO
+// ======================================
+app.post("/characters/train", async (req, res) => {
+    try {
+        // Necesitas el ID del personaje y la cantidad de EXP base (la ganancia base)
+        const { characterId, expGained } = req.body; 
+
+        if (!characterId || typeof expGained !== 'number') {
+            return res.status(400).json({ error: "Faltan characterId o expGained válidos." });
+        }
+        
+        // 1. OBTENER ESTADO ACTUAL
+        // Usamos la variable 'supabase' que ya está inicializada con el Service Role Key.
+        const { data: character, error: fetchError } = await supabase
+            .from("characters")
+            .select("id, exp, level, strength, agility") // Solo los campos necesarios
+            .eq("id", characterId)
+            .maybeSingle();
+
+        if (fetchError || !character) {
+            return res.status(404).json({ error: "Personaje no encontrado." });
+        }
+
+        // 2. APLICAR LÓGICA DE NIVELACIÓN (EN EL SERVIDOR)
+        let currentExp = character.exp || 0;
+        let currentLevel = character.level || 1;
+        let newExp = currentExp + expGained;
+        let newLevel = currentLevel;
+        let levelUpOccurred = false;
+
+        // Bucle para manejar múltiples subidas de nivel de golpe
+        let expRequired = getExpToNextLevel(newLevel);
+        
+        while (newExp >= expRequired) {
+            newLevel++;
+            newExp -= expRequired;
+            expRequired = getExpToNextLevel(newLevel);
+            levelUpOccurred = true;
+        }
+
+        // 3. DEFINIR ACTUALIZACIONES (incluyendo el incremento de STATS)
+        const updates = {
+            exp: newExp,
+            level: newLevel,
+            // Ejemplo de cálculo de stats:
+            strength: newLevel * 2, 
+            agility: newLevel * 2 
+        };
+
+        // 4. ACTUALIZAR LA BASE DE DATOS (Servicio de Rol de Supabase)
+        const { data: updatedCharacter, error: updateError } = await supabase
+            .from("characters")
+            .update(updates)
+            .eq("id", characterId)
+            .select()
+            .single();
+
+        if (updateError) throw updateError;
+
+        // 5. ENVIAR RESPUESTA AL CLIENTE
+        res.json({ 
+            message: "Entrenamiento completado y progreso guardado.",
+            character: updatedCharacter, // El cliente necesita esta data actualizada
+            levelUpOccurred 
+        });
+
+    } catch (error) {
+        console.error('❌ Error en /characters/train:', error);
+        res.status(500).json({ error: 'Error interno del servidor.', message: error.message });
+    }
+});
+
 // Manejo de errores global
 app.use((err, req, res, next) => {
   console.error('❌ Error global:', err);
