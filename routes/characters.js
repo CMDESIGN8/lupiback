@@ -134,27 +134,5 @@ router.put("/:id/stat", async (req, res) => {
   }
 });
 
-/* ===============================
-   GET: Obtener personaje por ID
-   =============================== */
-router.get("/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const { data: char, error: charError } = await supabase
-      .from("characters")
-      .select("*")
-      .eq("id", id)
-      .single();
-    
-    if (charError || !char) {
-      return res.status(404).json({ error: "Personaje no encontrado" });
-    }
-    
-    return res.json(char);
-  } catch (err) {
-    console.error("❌ Error obteniendo personaje:", err);
-    return res.status(500).json({ error: "Error interno" });
-  }
-});
 
 export default router;
