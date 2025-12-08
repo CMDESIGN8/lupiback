@@ -157,27 +157,4 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/* ===============================
-   GET: Obtener wallet por character_id
-   =============================== */
-router.get("/wallets/:characterId", async (req, res) => {
-  const { characterId } = req.params;
-  try {
-    const { data: wallet, error: walletError } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("character_id", characterId)
-      .single();
-    
-    if (walletError || !wallet) {
-      return res.status(404).json({ error: "Wallet no encontrada" });
-    }
-    
-    return res.json(wallet);
-  } catch (err) {
-    console.error("❌ Error obteniendo wallet:", err);
-    return res.status(500).json({ error: "Error interno" });
-  }
-});
-
 export default router;
