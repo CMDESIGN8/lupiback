@@ -5,7 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 import characterRoutes from "./routes/characters.js";
 import botRoutes from "./routes/bots.js";
 import clubRoutes from "./routes/clubs.js";
-import walletsRouter from './routes/wallets.js';
 
 dotenv.config();  
 
@@ -182,7 +181,6 @@ app.post("/characters/train", async (req, res) => {
 app.use("/characters", characterRoutes);
 app.use("/bots", botRoutes);
 app.use("/clubs", clubRoutes);
-app.use('/api/wallets', walletsRouter);
 
 // Obtener personaje por user_id
 app.get("/characters/:userId", async (req, res) => {
