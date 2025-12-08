@@ -134,4 +134,50 @@ router.put("/:id/stat", async (req, res) => {
   }
 });
 
+/* ===============================
+   GET: Obtener personaje por ID
+   =============================== */
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data: char, error: charError } = await supabase
+      .from("characters")
+      .select("*")
+      .eq("id", id)
+      .single();
+    
+    if (charError || !char) {
+      return res.status(404).json({ error: "Personaje no encontrado" });
+    }
+    
+    return res.json(char);
+  } catch (err) {
+    console.error("❌ Error obteniendo personaje:", err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
+
+/* ===============================
+   GET: Obtener wallet por character_id
+   =============================== */
+router.get("/wallets/:characterId", async (req, res) => {
+  const { characterId } = req.params;
+  try {
+    const { data: wallet, error: walletError } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("character_id", characterId)
+      .single();
+    
+    if (walletError || !wallet) {
+      return res.status(404).json({ error: "Wallet no encontrada" });
+    }
+    
+    return res.json(wallet);
+  } catch (err) {
+    console.error("❌ Error obteniendo wallet:", err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
+
 export default router;
