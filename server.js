@@ -96,6 +96,7 @@ app.post("/characters", async (req, res) => {
 app.use("/characters", characterRoutes);
 app.use("/bots", botRoutes);
 app.use("/clubs", clubRoutes);
+app.use("/futsal", futsalRoutes);
 
 // Obtener personaje por user_id
 app.get("/characters/:userId", async (req, res) => {
