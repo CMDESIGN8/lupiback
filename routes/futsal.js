@@ -113,6 +113,77 @@ router.post('/matches/stats', async (req, res) => {
   }
 });
 
+// routes/futsal.js - Agrega esta ruta
+router.get("/bots/opponent", async (req, res) => {
+  try {
+    const { playerLevel } = req.query;
+    const targetLevel = Math.max(1, Math.min(10, Math.round(playerLevel || 1)));
+    
+    console.log("🤖 Buscando bot para nivel:", targetLevel);
+    
+    // Usar la tabla 'bots' que ya tienes en tu schema
+    const { data: bots, error } = await supabase
+      .from("bots")
+      .select("*")
+      .order("level", { ascending: true })
+      .limit(10);
+      
+    if (error) {
+      console.error("❌ Error Supabase:", error);
+      throw error;
+    }
+    
+    if (!bots || bots.length === 0) {
+      // Si no hay bots, crear uno por defecto
+      const defaultBot = {
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "Bot Estándar",
+        level: Math.max(1, Math.min(targetLevel, 10)),
+        difficulty: "medium",
+        pase: 50,
+        tiro: 50,
+        regate: 50,
+        velocidad: 50,
+        defensa: 50,
+        potencia: 50
+      };
+      console.log("✅ Usando bot por defecto:", defaultBot.name);
+      return res.json(defaultBot);
+    }
+    
+    // Seleccionar bot con nivel similar
+    const suitableBots = bots.filter(bot => 
+      Math.abs(bot.level - targetLevel) <= 3
+    );
+    
+    const selectedBot = suitableBots.length > 0 
+      ? suitableBots[Math.floor(Math.random() * suitableBots.length)]
+      : bots[0];
+    
+    console.log("✅ Bot seleccionado:", selectedBot.name, "nivel", selectedBot.level);
+    res.json(selectedBot);
+    
+  } catch (error) {
+    console.error("❌ Error en get bot opponent:", error);
+    
+    // Bot de fallback para evitar errores
+    const fallbackBot = {
+      id: "00000000-0000-0000-0000-000000000001",
+      name: "Bot Rápido",
+      level: Math.max(1, Math.round((playerLevel || 1) / 2)),
+      difficulty: "medium",
+      pase: 60,
+      tiro: 55,
+      regate: 65,
+      velocidad: 70,
+      defensa: 45,
+      potencia: 50
+    };
+    
+    res.json(fallbackBot);
+  }
+});
+
 // Historial de partidos
 router.get('/matches/history/:characterId', async (req, res) => {
   try {
