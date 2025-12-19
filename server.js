@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import characterRoutes from "./routes/characters.js";
 import botRoutes from "./routes/bots.js";
 import clubRoutes from "./routes/clubs.js";
+import futsalRoutes from "./routes/futsal.js";
 
 dotenv.config();  
 
